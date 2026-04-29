@@ -15,7 +15,7 @@ class GoogleSheetInfo:
     history_good_results_sheet: str | None = None
     history_skip_results_sheet: str | None = None
     history_error_results_sheet: str | None = None
-    hubspot_database_sheet: str | None = None
+
 
 @dataclass
 class DomainInput:

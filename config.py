@@ -25,7 +25,6 @@ class Settings:
         history_good_results_sheet=os.environ.get("HISTORY_GOOD_RESULTS_SHEET"),
         history_skip_results_sheet=os.environ.get("HISTORY_SKIP_RESULTS_SHEET"),
         history_error_results_sheet=os.environ.get("HISTORY_ERROR_RESULTS_SHEET"),
-        hubspot_database_sheet=os.environ.get("HUBSPOT_DATABASE_SHEET"),
 
     )
     proxy = None

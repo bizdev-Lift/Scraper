@@ -11,7 +11,6 @@ from _types import GoogleSheetInfo, DomainInput, DomainResponse
 from config import settings
 from hubspot.records_api import HubSpotCompaniesClient
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -67,6 +66,7 @@ class GoogleSheetsHandler:
             [*record, datetime.datetime.now().strftime("%d-%m-%Y")],
             table_range="A:F",
         )
+
 
 class BaseSheetStrategy(ABC):
     """Defines the interface that MainExecutor depends on."""
@@ -163,7 +163,7 @@ class ProductionSheetStrategy(BaseSheetStrategy):
         self.good_sheet = handler.open_sheet(info.good_results_sheet)
         self.skip_sheet = handler.open_sheet(info.skip_results_sheet)
         self.error_sheet = handler.open_sheet(info.error_results_sheet)
-        self.history_domains = []  # self._load_history_domains()
+        self.history_domains = self._load_history_domains()
 
     def get_records(self) -> list[DomainInput]:
         records = []
@@ -180,7 +180,7 @@ class ProductionSheetStrategy(BaseSheetStrategy):
             count -= 1
 
         hubspot_client = HubSpotCompaniesClient(settings.hubspot_api_key)
-        self.history_domains = hubspot_client.get_existing_domains(records_to_check)
+        self.history_domains = self.history_domains.union(hubspot_client.get_existing_domains(records_to_check))
         return records
 
     def is_seen(self, record: DomainInput) -> bool:
@@ -224,3 +224,18 @@ class ProductionSheetStrategy(BaseSheetStrategy):
             ],
             table_range="A:N",
         )
+
+    def _load_history_domains(self) -> set[str]:
+        info = self.handler.spreadsheet_info
+        sheet_names = [
+            info.history_good_results_sheet,
+            info.history_skip_results_sheet,
+            info.history_error_results_sheet,
+        ]
+        domains = set()
+        for sheet_name in sheet_names:
+            sheet = self.handler.open_sheet(sheet_name)
+            for record in sheet.get_all_values("A:B")[1:]:
+                if record[0] and GoogleSheetsHandler.is_domain(record[0]):
+                    domains.add(record[0].lower())
+        return domains

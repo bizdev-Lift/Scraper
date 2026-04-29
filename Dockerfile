@@ -67,6 +67,7 @@ RUN playwright install chromium --with-deps
 COPY io_operations ./io_operations
 COPY llm ./llm
 COPY scraper ./scraper
+COPY hubspot ./hubspot
 COPY _types.py _types.py
 COPY executor.py executor.py
 COPY logger.py logger.py

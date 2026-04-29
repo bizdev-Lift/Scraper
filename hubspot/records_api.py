@@ -17,7 +17,7 @@ class HubSpotCompaniesClient:
         resp.raise_for_status()
         return resp.json()
 
-    def get_existing_domains(self, domains: list[str]) -> list[str]:
+    def get_existing_domains(self, domains: list[str]) -> set[str]:
         """
         Given a list of domains, returns only those NOT present in HubSpot.
         Chunks into batches of 5 (HubSpot filterGroups limit).
@@ -49,4 +49,4 @@ class HubSpotCompaniesClient:
             if domain:
                 found.add(domain.lower())
 
-        return found
+        return set(found)
