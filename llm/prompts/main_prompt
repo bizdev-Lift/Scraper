@@ -1,0 +1,473 @@
+
+**Role:** You are an AI assistant specialized in analyzing webpage content to extract key business information with high accuracy and consistency.
+
+**Task:** Analyze the HTML content of a company's webpage and answer the following questions based *exclusively* on visibly rendered content within the HTML structure. **CRITICAL: Exclude any information found within `<script>` tags, `<style>` tags, JSON-LD data, comments, or other non-displayed elements. Focus solely on text that would be visible to a user viewing the rendered page. ACCURACY IS THE TOP PRIORITY.**
+**Input:**
+<html_content>
+{{CONTENT}}
+</html_content
+
+## Analysis Instructions & Questions:
+
+### 1. Website Viability (json_key: website_availability)
+**Question:** Is this a functional, active business website with meaningful content?
+
+**Criteria for "Yes":**
+- Contains substantial business-related content (not just placeholder text)
+- No explicit "closed," "under construction," or "coming soon" messages
+- Has clear business purpose and information
+
+**Criteria for "No":**
+- Explicitly states business is closed/defunct (e.g., "This business is now closed")
+- Clear "under construction" or "coming soon" messages
+- Only placeholder content (Lorem ipsum, etc.)
+- Error pages or broken content
+
+*Answer: Yes/No*
+
+### 2. Headquarters Phone Number (json_key: hq_phone_no)
+**Question:** What is the main company phone number visible on the page?
+
+**Search Priority (in order):**
+1.  Numbers explicitly labeled: "Headquarters," "Main Office," "Corporate," "Main Number"
+2.  Numbers in "Contact Us" or "Contact" sections
+3.  Numbers labeled "Customer Service" or "Customer Support"
+4.  Any other phone numbers on the page
+
+**Validation Rules:**
+- Must be at least 10 digits (including area code)
+- Must be a phone number format (not fax, not email)
+- Avoid department-specific numbers if a main number exists
+- Must be associated with the company (not dealers/distributors)
+- Format consistently: include country code if visible
+
+**If no valid phone number found, return empty string: ""**
+
+*Answer: [Phone Number] or ""*
+
+### 3. Headquarters Address Listed (json_key: hq_address_listed)
+**Question:** Is a complete headquarter/company address visible on the page?
+
+**Requirements for "Yes" (ALL must be present and visible):**
+- Street address (number and street name)
+- City name
+- State/Province/Region
+- Must be clearly associated with the main company (not a branch/dealer)
+
+**Common locations to check:**
+- Footer sections
+- "Contact Us" pages/sections
+- "About Us" sections
+- Dedicated address/location sections
+
+**Multiple locations rule:** If the company lists multiple office or store locations on a Contact Us or Locations page, return "Yes" — these are the company's own addresses. You do NOT need a label like "Headquarters" or "Main Office." Any complete address belonging to the company qualifies.
+
+**Sub-brand rule:** If the company operates under multiple brand names or sub-brands (e.g. ProSource, Carpet One) but all locations are listed on the same company website under a Locations or Contact page, return "Yes" — these are still the company's own addresses.
+
+**Exclude Address if address is related to following things:**
+- P.O. Box only (without street address)
+- Incomplete addresses (missing components)
+- Obviously fake addresses (123 Main St, John Doe, etc.)
+- Dealer/distributor addresses
+- Product shipping addresses
+
+*Answer: Yes/No*
+
+### 4. B2C Sales (Physical Goods) (json_key: b2c_sales)
+**Question:** Does the website sell physical products directly to consumers?
+
+**Look for visible indicators:**
+- **EXPLICIT** 
+    - "Add to Cart" or "Buy Now" or "View Cart" buttons or "Cart" icons *associated with specific valid product listings.*  The button must directly add the product to a shopping cart or initiate a clear purchase process. If this button or icon is not present then b2c_sales set to No. The button can have some other type of text as well like "Add to Basket", "Purchase", "Shop Now" etc.
+    - The following visible text phrases also qualify as cart indicators when at least one product with a visible price exists on the same page: "Your Cart", "My Cart", "View Cart", "Shopping Cart"
+    - Cart icon elements also qualify when atleast one of the THREE of the following are true: (1) the element's class attribute contains any of: `icon-cart`, `header-cart`, `cart-code`, `cart-link`, `cart-icon`, `cart-trigger`, `cart-toggle`, `mini-cart`, `minicart`, `js-cart`, `cart-btn`, `cart-button`, `cart-widget` (2) the element's href attribute contains the word "cart" anywhere (e.g. `/cart`, `/my-cart`, `/shopping-cart`, `/cart/view`, `/checkout/cart`) — this applies to BOTH relative URLs (e.g. /cart, /my-cart, /shopping-cart) AND absolute URLs (e.g. https://www.example.com/cart/, https://store.example.com/my-cart) (3) at least one product with a visible price exists on the page or if price doesn't exists then categories/groups of products should exist.
+
+- If any condition from **EXPLICIT** section is fulfilled then also ensure clear visibility of atleast one product with pricing or there are categories/groups of products listed where you can select and add products to your cart.
+
+**Examples:**
+- **YES:** An **Add to Cart** button or cart is available on the website. If cart is present then check product page features an image, description, price, and a prominent "Add to Cart" button that directly adds the product to a shopping cart. A "Checkout" button is also visible. Products must be actively available to purchase, not marked as "Coming Soon."
+- **NO:** The website mentions products in general terms but lacks any specific product listings, pricing, or a direct method to purchase them online (e.g., no "Add to Cart" buttons, no "Shop" section). A general "Cart" icon without any way to add products is also not sufficient. Links to product categories *without a direct purchase option on the product page* are also insufficient. A product marked "Coming Soon" without a purchase option also results in "No."
+
+**Important Considerations:**
+- For `b2c_sales` to be "Yes," the page *must* have  visible references to **Add to Cart** or **Buy Now** buttons or **"Cart" icons**. If the **Cart** is present then also check products, categories of products, OR an active "Shop" section *AND* a direct means of adding those products to a shopping cart or initiating a purchase. Phrases like "Browse our products," "Shop [Product Category]," or visible product names/descriptions are *not enough* unless accompanied by "Add to Cart/Buy Now" functionality.
+- If **Cart** is not present but the reference to products is available then we will start mark `b2c_sales` as `No`.
+- If the *majority* of the content revolves around announcements of closure, liquidation sales, or similar statements indicating the business is no longer actively operating as a standard retail outlet, `b2c_sales` should be "No."
+
+**Note:** Must be for physical goods, not just services or digital products.
+
+**CRITICAL: DO NOT consider elements with `display: none;`, `visibility: hidden;`, or similar styling that hides content from the user OR if any PARENT element has `display: none;`, `visibility: hidden;`, or similar styling.**
+**"CRITICAL: NO INFERENCE.** Do not assume a website sells physical products just because you see a 'Shop' menu link, product images, or price tags. For `b2c_sales` to be 'Yes,' the HTML must contain literal, functional purchase elements (e.g., an 'Add to Cart' button or a 'Cart' icon/link). If you only see a list of products without a direct way to add them to a basket or checkout in the provided code, you must return 'No'."
+
+*Answer: Yes/No*
+
+### 5. B2B Sales (json_key: b2b_sales)
+**Question:** Does the website explicitly mention selling to other businesses using specific keywords? This will be False unless the following terms/phrases are present **as a functional business offering.**
+
+**Look for visible terms/phrases (must be explicitly present):**
+**Partnership Terms:** 'Wholesale', 'Distributor', 'Reseller', 'Become a Dealer', 'Find a Dealer', **'Enterprise', 'Corporate'**
+**Account Types:** 'B2B', 'Trade Account', 'Business Account', 'Dealer Portal', 'Partner Portal', **'Business Solutions', 'Business Customers', 'Corporate Responsibility User (CRU)'**
+**Pricing Models:** 'Bulk Pricing', 'Volume Discounts', **'Fleet Pricing'**
+
+---
+⛔ **MANDATORY KEYWORD SCAN — You MUST complete this scan before setting b2b_sales to any value. There are NO exceptions.**
+
+Go through the visible HTML text and search for each keyword individually. Log every single one:
+
+- "Wholesale": [FOUND / NOT FOUND]
+- "Distributor": [FOUND / NOT FOUND]
+- "Reseller": [FOUND / NOT FOUND]
+- "Become a Dealer": [FOUND / NOT FOUND]
+- "Find a Dealer": [FOUND / NOT FOUND]
+- "Enterprise": [FOUND / NOT FOUND]
+- "Corporate": [FOUND / NOT FOUND]
+- "B2B": [FOUND / NOT FOUND]
+- "Trade Account": [FOUND / NOT FOUND]
+- "Business Account": [FOUND / NOT FOUND]
+- "Dealer Portal": [FOUND / NOT FOUND]
+- "Partner Portal": [FOUND / NOT FOUND]
+- "Business Solutions": [FOUND / NOT FOUND]
+- "Business Customers": [FOUND / NOT FOUND]
+- "Corporate Responsibility User": [FOUND / NOT FOUND]
+- "Bulk Pricing": [FOUND / NOT FOUND]
+- "Volume Discounts": [FOUND / NOT FOUND]
+- "Fleet Pricing": [FOUND / NOT FOUND]
+
+⛔ **HARD STOP: If ALL 18 entries above are NOT FOUND → `b2b_sales` = "No" immediately. Do NOT read the rest of the page for signals. Do NOT infer. This result is final.**
+
+Only if at least one keyword is FOUND, continue to the verification steps below.
+
+---
+**Functional Context (When to return "Yes"):**
+* The keyword represents a **service, account type, or partnership program** offered *to* other businesses (usually found in menus, footers, or "Work with us" sections).
+* **Dedicated contact channels (phone numbers or emails) are provided specifically for "Business Customers," "Corporate Accounts," or "Enterprise Solutions."**
+* The keyword must be part of a Navigation Menu, Footer, Header, or "Work with Us" section. It must represent a service or account type.
+
+* **"CRITICAL: NO INFERENCE.** Do not infer that a business is B2B based on professional-sounding programs. Terms like 'Sponsorships,' 'Strategic Alliances,' 'Race Director accounts,' 'Event Insurance,' or 'Affiliates' **DO NOT** count as B2B sales. This field must be 'No' unless one of the specific approved keywords (e.g., 'Wholesale,' 'Dealer,' 'Bulk Pricing') is found as a literal text string representing a functional business offering."
+
+**Constraint - When to return "No" even if keywords are found:**
+- **Keyword is present inside reviews/testimonials:** (e.g. Got this from X Dealer or I got a wheel from this dealer etc.)
+- **Keyword is inside a Blog Title or Article Heading:** (e.g., "Hand Sanitizer Wholesale - July Blog").
+- **Keyword is part of a Product Name or Description:** (e.g., "Wholesale Pack of 5 Clips").
+- **Keyword is purely descriptive of a single product:** It must represent a **service, account type, or partnership program** (usually found in menus, footers, or "Work with us" sections).
+- **Keyword refers to Consumer Loyalty or Upgrade Programs**: Exclude programs designed for individual retail customers to exchange, 'trade-in', or 'trade-up' used equipment for credit toward new purchases. These are B2C incentives, not B2B partnership programs.
+
+
+**"DO NOT infer B2B status based on the following:**
+- The presence of 'Parts,' 'Components,' or 'Building Materials' (e.g., wood veneers, fiberglass).
+- The mention of famous brands (e.g., Bear Archery).
+- The complexity or professional nature of the gear.
+- The presence of 'Custom' services.
+- Revenue or profit language like "Start generating real revenue"
+- Terms like "Sponsorships," "Strategic Alliances," "Affiliates," "Ambassador," "Investor"
+
+
+**Examples:**
+- **YES:** The footer has a link "Wholesale Inquiry" or "Dealer Portal."
+- **NO:** A blog link says "Tips for Wholesale buying" or a product title is "Wholesale LED Baton."
+- **NO:** The page has an "Ambassador" or "Investor" section.
+- **NO:** The page says "Biker Family Owned" or "riders helping riders" — this is culture language, not a B2B program.
+- **NO:** A customer review mentions "dealer" (e.g. "I got this from a dealer") — keywords in reviews never qualify.
+
+**CRITICAL: DO NOT consider elements with `display: none;`, `visibility: hidden;`, or similar styling that hides content from the user OR if any PARENT element has `display: none;`, `visibility: hidden;`, or similar styling.**
+
+*Answer: Yes/No*
+
+
+### 6. Industry Classification (json_key: industry_classification)
+**Question:** What industry best describes this company based on visible content?
+ 
+**Available Classifications — check ALL signals listed before selecting:**
+ 
+- **Apparel:** Clothing categories (Men/Women/Kids/Unisex), seasonal collections, fashion photography, size guides, fabric descriptions, style names. Includes activewear, swimwear, outerwear, footwear, hats, gloves, socks, scarves. Also includes fiber/yarn products sold as clothing material (e.g. alpaca fiber clothing, wool garments).
+  - *Signals:* size selectors (S/M/L/XL), "shop by gender", "new arrivals", "lookbook", clothing category names in nav menus
+ 
+- **Sporting Goods:** Gear for sports or outdoor activities — bikes, fishing, hunting, archery, camping, hiking, fitness, skiing, water sports. Performance and activity-focused language.
+  - *Signals:* sport/activity names in nav, gear specs, "performance", "trail", "competition", weight/durability specs, sport-specific accessories
+ 
+- **Auto Parts:** Car, truck, motorcycle, ATV, or powersport parts and accessories. Includes tires, wheels, exhaust, engine parts, body kits.
+  - *Signals:* vehicle year/make/model filters, "aftermarket", "OEM", "fitment", part numbers, vehicle-specific category names
+ 
+- **Home Goods:** Items used in the home — kitchenware, cookware, bedding, bath, décor, candles, storage, cleaning supplies. Does NOT include full furniture items (those are Bad Product Type).
+  - *Signals:* room names in categories (kitchen, bath, bedroom), "home décor", "interior", product descriptions mentioning home use
+ 
+- **Food and Beverage:** Consumable food or drink products. Includes specialty foods, supplements, coffee, tea, snacks.
+  - *Signals:* ingredients lists, nutritional info, dietary labels (vegan, gluten-free, organic), flavor descriptions, "shop by diet", expiry dates, food photography
+ 
+- **Industrial or Manufacturing:** B2B-oriented heavy equipment, raw materials, industrial tools, safety equipment, custom fabrication, OEM components, wholesale supplies.
+  - *Signals:* industrial certifications (ISO, OSHA), "bulk order", "lead time", "custom fabrication", spec sheets, material grades, engineering language
+ 
+- **Electronics:** Consumer or commercial electronic devices, components, and accessories — gadgets, chargers, cables, circuit boards, audio/video equipment, smart devices.
+  - *Signals:* tech specs (voltage, wattage, MHz, GB), compatibility lists, "plug and play", connector types
+ 
+- **Cosmetics:** Skincare, makeup, haircare, fragrance, personal care products.
+  - *Signals:* "cruelty-free", "vegan", "organic", "dermatologist tested", skin type mentions, ingredient lists, SPF ratings, beauty photography
+ 
+- **Medical:** Medical devices, clinical equipment, patient care tools, pharmaceutical products, healthcare supplies.
+  - *Signals:* FDA clearance/approval mentions, HIPAA language, clinical terminology, device classification numbers, "sterile", prescription-only language
+ 
+- **Other:** Use ONLY when you have clearly identified the industry but it does not match ANY of the categories above. Examples: jewelry, pet supplies, toys, office supplies, arts & crafts, books, musical instruments, software, pure service businesses. Do NOT use "Other" as a fallback when uncertain — use "N/A" for uncertainty instead.
+ 
+- **Mixed:** Use when the site clearly and equally sells products from TWO OR MORE of the listed industry categories above. Both categories must be identifiable from primary navigation, hero content, or product listings — not just a minor secondary offering.
+  - Example: A site selling both motorcycle parts AND motorcycle apparel → **Mixed** (Auto Parts + Apparel)
+  - Example: A site selling both fitness equipment AND supplements → **Mixed** (Sporting Goods + Food and Beverage)
+  - Example: A site primarily selling clothing with one accessories section → **Apparel** (not Mixed — accessories are secondary)
+  - Rule: If one category accounts for more than ~70% of visible products/nav items, pick that single category instead of Mixed.
+ 
+**Disambiguation rules (common confusions):**
+- Alpaca fiber products / wool / yarn sold as clothing or worn as garments → **Apparel**
+- Rugs, carpets, flooring → **Home Goods**
+- Motorcycle/ATV accessories → **Auto Parts** (not Sporting Goods)
+- Supplements/vitamins → **Food and Beverage** (not Medical, unless clinical)
+- Safety helmets for work → **Industrial or Manufacturing** (not Sporting Goods)
+- Fitness trackers/smartwatches → **Electronics** (not Sporting Goods)
+- Jewelry, watches (non-smart), handbags → **Other**
+- Pet products → **Other**
+ 
+**Selection Criteria — decision order (follow this sequence):**
+1. Identify all product/service categories visible on the page
+2. For each identified category, find the CLOSEST SEMANTIC MATCH from the available classifications. Do not require exact wording — use the meaning, not the label. Use the semantic mapping table below.
+3. If they all map to a SINGLE listed category → return that category
+4. If they clearly map to TWO OR MORE listed categories with roughly equal presence → return **Mixed**
+5. If the industry is clearly identifiable but still has NO semantic match in the list after checking the table → return **Other**
+6. If evidence is genuinely insufficient to identify the industry → return **N/A**
+ 
+⛔ Do NOT use "Other" when you are uncertain — "Other" means "I identified the industry but it genuinely has no match in the list." Uncertainty = "N/A".
+⛔ Do NOT use "Other" or "N/A" when a semantic match exists in the table below — always map to the closest listed category first.
+⛔ Do NOT use "Mixed" for a dominant category with minor secondary products — use Mixed only when two or more listed categories have roughly equal weight on the page.
+ 
+**Semantic mapping table — map what you see on the page to the correct classification:**
+ 
+| What you identified on the page | Correct classification |
+|---|---|
+| Automotive, Cars, Vehicles, Trucks, Auto accessories | **Auto Parts** |
+| Motorcycles, Motorcycle parts, Powersports, ATV, UTV, Scooters | **Auto Parts** |
+| Bicycles, Cycling gear, Mountain bikes, BMX | **Sporting Goods** |
+| Clothing, Fashion, Garments, Wear, Outfits, Uniforms | **Apparel** |
+| Footwear, Shoes, Boots, Sneakers, Sandals | **Apparel** |
+| Fiber, Yarn, Wool, Alpaca, Cashmere (sold as wearable garments) | **Apparel** |
+| Outdoor gear, Camping, Hunting, Fishing, Hiking, Climbing | **Sporting Goods** |
+| Fitness, Gym equipment, Exercise gear, Sports equipment, Athletics | **Sporting Goods** |
+| Home décor, Household items, Kitchenware, Bedding, Bath | **Home Goods** |
+| Flooring, Rugs, Carpets, Curtains, Blinds, Tiles | **Home Goods** |
+| Furniture hardware, Cabinet components (not full furniture units) | **Home Goods** |
+| Food, Grocery, Snacks, Beverages, Drinks, Coffee, Tea, Alcohol | **Food and Beverage** |
+| Supplements, Vitamins, Protein powder, Nutrition products | **Food and Beverage** |
+| Machinery, Heavy equipment, Industrial tools, Fabrication | **Industrial or Manufacturing** |
+| Safety equipment (workplace), PPE, Industrial supplies, Raw materials | **Industrial or Manufacturing** |
+| Gadgets, Tech accessories, Computers, Audio/video equipment | **Electronics** |
+| Smart devices, Chargers, Cables, Circuit boards, Components | **Electronics** |
+| Skincare, Makeup, Beauty products, Haircare, Fragrance | **Cosmetics** |
+| Personal care, Grooming, Toiletries, Nail care | **Cosmetics** |
+| Healthcare, Medical equipment, Clinical supplies, Diagnostics | **Medical** |
+| Pharmacy, Prescription products, Patient care, Surgical tools | **Medical** |
+| Jewelry, Watches (non-smart), Accessories (non-apparel) | **Other** |
+| Pet supplies, Animal products, Veterinary products | **Other** |
+| Toys, Games, Hobby supplies, Arts & crafts | **Other** |
+| Books, Software, Digital products, Pure services | **Other** |
+
+
+**CRITICAL: DO NOT consider elements with `display: none;`, `visibility: hidden;`, or similar styling that hides content from the user OR if any PARENT element has `display: none;`, `visibility: hidden;`, or similar styling.**
+
+*Answer: [Selected Industry] or "N/A"*
+
+## 7. E-commerce Platform (json_key: ecommerce_platform)
+**Question:** What e-commerce platform powers this website (if identifiable)?
+
+**Detection Method — scan ALL five signal types before concluding:**
+
+**Signal Type 1 — URL patterns in href links (most reliable, check first):**
+Scan ALL href attributes in the HTML for these patterns:
+
+| URL pattern found in href | Platform |
+|---|---|
+| `/dp/` followed by a number (e.g. `/dp/8688/`) | **3D Cart** |
+| `/products/slug` or `/collections/` | **Shopify** |
+| `/product-category/` or `?p=` or `/wp-content/` | **Woo Commerce** |
+| `/catalog/product/` or `/catalogsearch/result/` | **Magento** |
+| `mm5/merchant.mvc` or `Screen=PROD` or `Screen=CTGY` or `Store_Code=` | **Miva Merchant** |
+| `/store/main/category.cfm` or `/store/parts/view.cfm` or `.cfm` in store paths | **Miva Merchant** |
+| `/cart.php` or `login.php` in store paths | **Big Commerce** |
+| `index.php?id_product=` | **Prestashop** |
+| `?route=product/product` or `/index.php?route=` | **Zen Cart or X-Cart** |
+| `wixsite.com` or `wix.com` in any URL | **Wix** |
+| `squarespace.com` in any URL or asset path | **Squarespace** |
+| `/webflow.io` or `webflow.com` in asset paths | **Webflow** |
+| `volusion.com` in asset or script paths | **Volusion** |
+| `nopcommerce` in URLs or class names | **nopCommerce** |
+
+**Signal Type 2 — Script src URLs (scan all `<script src="...">` tags):**
+
+| Script src contains | Platform |
+|---|---|
+| `cdn.shopify.com` | **Shopify** |
+| `woocommerce` or `wp-content/plugins/woocommerce` | **Woo Commerce** |
+| `cdn.bigcommerce.com` or `bigcommerce` | **Big Commerce** |
+| `app.ecwid.com` or `ecwid.com` | **Ecwid** |
+| `static.squarespace.com` | **Squarespace** |
+| `wixstatic.com` or `static.wixstatic.com` | **Wix** |
+| `js.demandware.net` | **Demandware** |
+| `commercecloud.salesforce` | **Salesforce Commerce Cloud** |
+| `sanacommerce.com` | **Sana Commerce** |
+| `webjaguar.com` | **Webjaguar** |
+| `smartetailing.com` | **SmartEtailing** |
+| `revolutionparts.com` | **Revolution Parts** |
+| `ariconnection.com` or `arinet.com` | **ARI** |
+
+**Signal Type 3 — Meta tags and HTML comments (scan `<head>` section):**
+
+| Meta tag or comment contains | Platform |
+|---|---|
+| `<meta name="generator" content="Shopify">` | **Shopify** |
+| `<meta name="generator" content="WooCommerce">` | **Woo Commerce** |
+| `<meta name="generator" content="Magento">` | **Magento** |
+| `<meta name="generator" content="PrestaShop">` | **Prestashop** |
+| `<meta name="generator" content="BigCommerce">` | **Big Commerce** |
+| `<meta name="generator" content="nopCommerce">` | **nopCommerce** |
+| `Powered by Shopify` in footer or HTML comments | **Shopify** |
+| `Powered by BigCommerce` in footer | **Big Commerce** |
+| `sqsp` class names or `Built on Squarespace` | **Squarespace** |
+
+**Signal Type 4 — CSS class names and data attributes (scan body/div classes):**
+
+| Class name or data attribute contains | Platform |
+|---|---|
+| `shopify-section` or `shopify-payment-button` | **Shopify** |
+| `woocommerce` or `wc-` prefix on classes | **Woo Commerce** |
+| `sqsp-` or `sqs-` prefix | **Squarespace** |
+| `wix-image` or `x-wix-` | **Wix** |
+| `w-commerce-` | **Webflow** |
+| `bc-` prefix (BigCommerce Stencil framework) | **Big Commerce** |
+| `mvt:` template tags or `miva` in class names | **Miva Merchant** |
+
+**Signal Type 5 — Footer text and copyright notices:**
+- Scan footer for: "Powered by [Platform]", "Built with [Platform]", platform name in copyright
+- Examples: "Powered by Shopify", "© BigCommerce Pty. Ltd.", "Powered by nopCommerce"
+
+**Priority rule:** Trust Signal Type 1 (URL patterns) first, then Type 2 (scripts), then Types 3-5.
+
+**Available Options:**
+Miva Merchant, Web Shop Manager, Cart Functionality, Ecwid, Squarespace, Wix, SmartEtailing, Revolution Parts, Volusion, Demandware, Webflow, Sana Commerce, Woo Commerce, Magento, Second Phase, Shopify, Webjaguar, nopCommerce, Weblink Corp, NA, 3D Cart, BV Commerce, Work Area, ARI, Big Commerce, Netsuite, X-Cart, Prestashop, SAP Commerce, SAP Commerce Cloud, Drupal Commerce, Salesforce Commerce Cloud, Zen Cart
+
+**Return "NA" if:** No signals from any of the 5 types above match any platform. Do not guess based on visual appearance or design alone.
+
+**CRITICAL: DO NOT consider elements with `display: none;`, `visibility: hidden;`, or similar styling that hides content from the user OR if any PARENT element has `display: none;`, `visibility: hidden;`, or similar styling.**
+
+*Answer: [Platform Name] or "N/A"*
+
+### 8. Important Links (json_key: links)
+**Question:** What are the key navigation links (up to 2) based on priority?
+
+**Priority Order:**
+1.  About Us / About pages
+2.  Contact Us / Contact pages
+3.  Customer Service pages
+4.  Customer Support pages
+
+**Requirements:**
+- Extract up to 2 links maximum
+- Only extract relative URLs
+- Return as array/list format
+- No duplicates
+- Must be actual clickable links from the page and should be from the priority order.
+- We don't need links other than what is mentioned in Priority Order.
+
+**Example:**
+
+- **Valid:** `"/about-us"`, `"/contact"`
+-  **Invalid:** `"https://example.com/about"`, `"mailto:info@example.com"`
+
+**CRITICAL: DO NOT consider elements with `display: none;`, `visibility: hidden;`, or similar styling that hides content from the user OR if any PARENT element has `display: none;`, `visibility: hidden;`, or similar styling.**
+
+*Answer: [Array of up to 2 URLs]*
+
+### 9. US Based (json_key: is_us_based)
+**Question:** Is this company verifiably US-based?
+
+**Check the following signals (any one is sufficient):**
+- A complete US address is visible (street, city, US state)
+- A US phone number is visible (US area code, +1 country code)
+- "Made in USA" or "Ships from USA" text is visible
+- The website TLD is ".com" or ".us"
+
+**Return "Yes" only if at least one of the above is confirmed from visible content.**
+**Return "No" if the address, phone number, or TLD clearly indicates a non-US country or if there is genuinely no signal either way.**
+**CRITICAL: DO NOT consider elements with `display: none;`, `visibility: hidden;`, or similar styling that hides content from the user OR if any PARENT element has `display: none;`, `visibility: hidden;`, or similar styling.**
+*Answer: Yes/No*
+
+### 10. Bad Product Type (json_key: bad_product_type)
+**Question:** Does this website primarily sell any of the following disqualifying product types?
+
+- **Alcohol:** Beer, wine, spirits, liquor, hard cider, mead, or any alcoholic beverage
+- **Jewelry:** Rings, necklaces, bracelets, earrings, watches, gemstones, diamonds, fine or fashion jewelry
+- **Guns / Firearms:** Guns, pistols, rifles, shotguns, ammunition, or firearm accessories
+- **Furniture:** Beds, sofas, couches, dining tables, chairs, desks, dressers, wardrobes, cabinets, bookshelves, TV stands, or any home/office furniture — regardless of assembly requirements
+- **Service-based businesses:** Sites that connect customers to service providers without selling physical products
+
+**CRITICAL: NO INFERENCE.**
+- Do not flag a product based on a keyword alone. Verify the product category from image descriptions, product titles, or category names.
+- Example: A "Spirits" bicycle brand is NOT alcohol. A "Diamond" cleaning product is NOT jewelry.
+
+**Return "Yes" if the PRIMARY product category matches any of the above.**
+**Return "No" otherwise.**
+**CRITICAL: DO NOT consider elements with `display: none;`, `visibility: hidden;`, or similar styling that hides content from the user OR if any PARENT element has `display: none;`, `visibility: hidden;`, or similar styling.**
+*Answer: Yes/No*
+
+
+## Critical Guidelines:
+1. **JSON Only**: Only JSON response will be accepted. I have already explained the key names above so the output returned by gemini should be a JSON.
+2. **REASONING**: I need a *reasoning* key at the end that will contain *ONE LINER* reasoning for every above key e.g.
+    {
+        "reasoning": {
+            b2c_sales: "We selected Yes because ..."
+            b2b_sales: "We selected No because...." etc..
+        }
+    }
+
+    - For b2c_sales and b2b_sales, the reasoning must include the literal text string or HTML attribute (e.g., id="add-to-cart-button" or text="Wholesale Login") that triggered the 'Yes' response. If 'No', the reasoning must state: 'No functional purchase/wholesale elements found in visible HTML text or attributes.
+    - DO NOT mark b2c_sales as 'Yes' solely based on the presence of a price tag ($), a 'Shop' menu link, or a 'Product' gallery. Many B2B sites show prices but require a login or phone call to purchase. Only 'Add to Cart', 'Buy Now', or a functional 'Checkout' path counts."
+2. **Visible Content Only:** Base ALL answers exclusively on content that is visible in the provided HTML. **CHECK THE CLASSES AND MAKE SURE THEY DON'T HAVE `display: none` OR `visibility: hidden` IN THEM, EITHER DIRECTLY IN THE STYLE ATTRIBUTE OR IN A CSS CLASS. ALSO, ENSURE THAT NO PARENT ELEMENT OF THE TAG HAS THESE STYLES APPLIED.** This is the MOST IMPORTANT RULE.
+
+3. **No Assumptions:** Don't infer or guess. If information isn't explicitly visible and meeting the criteria, answer accordingly (No, N/A, or empty string).
+
+4. **Consistency:** Provide identical answers for identical content. Don't introduce randomness.
+
+5. **Accuracy First:** Double-check each answer against the specific criteria before finalizing.
+
+6. **Format Compliance:** Return answers in exactly the specified format for each field.
+
+---
+
+⛔ **FINAL SELF-CHALLENGE — COMPLETE ALL STEPS BEFORE OUTPUTTING JSON:**
+
+**Step 0 — Bad Product Type check:**
+Before checking anything else, identify the PRIMARY product category of the website. If it is furniture (beds, sofas, tables, chairs, dressers, cabinets, wardrobes, desks, bookshelves, or any home/office furniture), jewelry, alcohol, or firearms → `lead_status` MUST be "Unqualified – Bad Product Type" regardless of b2c_sales or b2b_sales values.
+
+**Step 1 — Top-level type check:**
+Confirm that top-level `b2c_sales` and `b2b_sales` are plain strings ("Yes" or "No") and not objects. If they are objects, flatten to the conclusion string and move all sub-fields into reasoning.
+
+**Step 2 — Verbatim check:**
+For any field where top-level `b2c_sales` or `b2b_sales` is "Yes" — can you copy-paste the EXACT triggering text or attribute verbatim from the HTML? If no → change to "No".
+
+**Step 3 — Contradiction word check for b2b_sales:**
+If reasoning.b2b_sales contains any of: "implied", "contextually", "suggests", "inferred", "appears to", "likely", "probably", "could be", "seems", "although", "standard trigger", "contextually implied" → change top-level `b2b_sales` to "No".
+
+**Step 3b — Reasoning/output consistency check:**
+Read your reasoning for b2b_sales. Find the LAST sentence that states a conclusion (e.g. "b2b_sales is No", "Correcting: b2b_sales is No", "Since all are NOT FOUND, B2B is No").
+- If that final conclusion says "No" → the top-level `b2b_sales` in the JSON MUST be "No". If it currently says "Yes", fix it now before outputting.
+- If that final conclusion says "Yes" → verify it passed the full scan and all verification steps before allowing it.
+
+**Step 4 — Self-invalidation check:**
+Confirm verbatim surrounding text actually contains the stated trigger/keyword as a substring. If not → answer is "No".
+
+**Step 5 — lead_status consistency check:**
+If `lead_status` is "Unqualified – Junk Lead / No Shipping" but top-level `b2c_sales` is "Yes" OR top-level `b2b_sales` is "Yes" → this is a contradiction. You MUST change `lead_status` to "Lift Prime" (assuming website is active and US-based). A Junk Lead can only be assigned when BOTH b2c_sales AND b2b_sales are "No".
+
+---
+
+**Final Verification Checklist:**
+- [ ] All answers based solely on visible HTML content
+- [ ] No information extracted from scripts, styles, or comments
+- [ ] Each answer meets the specific criteria outlined
+- [ ] All elements considered and their parent elements verified for hidden styling
+- [ ] Format matches requirements exactly
+- [ ] No null/None values returned
