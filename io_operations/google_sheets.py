@@ -63,7 +63,7 @@ class GoogleSheetsHandler:
 
     def update_stats(self, record: list[str]):
         self.stats_sheet.append_row(
-            [*record, datetime.datetime.now().strftime("%d-%m-%Y")],
+            [*record, datetime.datetime.now().strftime("%m-%d-%Y")],
             table_range="A:F",
         )
 
@@ -83,6 +83,17 @@ class BaseSheetStrategy(ABC):
     @abstractmethod
     def on_complete(self, records: list[DomainInput]) -> None: ...
 
+    def get_unique_records(self, records: list) -> list:
+        seen = set()
+        unique = []
+        for item in records:
+            t = tuple(item)
+            if t not in seen:
+                seen.add(t)
+                unique.append(item)
+
+        return unique
+
 
 class RegularSheetStrategy(BaseSheetStrategy):
     """Single-sheet: reads and updates records in place."""
@@ -91,7 +102,7 @@ class RegularSheetStrategy(BaseSheetStrategy):
         self.sheet = handler.open_sheet(handler.spreadsheet_info.sheet_name)
 
     def get_records(self) -> list[DomainInput]:
-        values = self.sheet.get_all_values("A:J")[1:]
+        values = self.get_unique_records(self.sheet.get_all_values("A:J")[1:])
         records = []
         count = copy.deepcopy(settings.max_input_records)
         logger.info(f"Total records to process: {count}")
@@ -169,9 +180,8 @@ class ProductionSheetStrategy(BaseSheetStrategy):
         records = []
         records_to_check = []
         count = copy.deepcopy(settings.max_input_records)
-        for index, record in enumerate(
-            self.input_sheet.get_all_values("A:B")[1:], start=2
-        ):
+        unique_input_domains = self.get_unique_records(self.input_sheet.get_all_values("A:B")[1:])
+        for index, record in enumerate(unique_input_domains, start=2):
             if count == 0:
                 break
             if record[0] and GoogleSheetsHandler.is_domain(record[0]):
@@ -180,7 +190,9 @@ class ProductionSheetStrategy(BaseSheetStrategy):
             count -= 1
 
         hubspot_client = HubSpotCompaniesClient(settings.hubspot_api_key)
-        self.history_domains = self.history_domains.union(hubspot_client.get_existing_domains(records_to_check))
+        self.history_domains = self.history_domains.union(
+            hubspot_client.get_existing_domains(records_to_check)
+        )
         return records
 
     def is_seen(self, record: DomainInput) -> bool:
@@ -220,7 +232,7 @@ class ProductionSheetStrategy(BaseSheetStrategy):
                 output.lead_status,
                 output.revenue,
                 output.redirected_to,
-                datetime.datetime.now().strftime("%d-%m-%Y"),
+                datetime.datetime.now().strftime("%m-%d-%Y"),
             ],
             table_range="A:N",
         )
