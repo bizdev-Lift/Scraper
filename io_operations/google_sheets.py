@@ -152,16 +152,20 @@ class RegularSheetStrategy(BaseSheetStrategy):
             output.ecommerce_platform,
             output.lead_status,
             output.revenue,
+            output.shipping_messaging,
+            output.shipping_methods,
+            output.carriers,
+            output.product_size_weight,
             output.redirected_to,
             output.old_lead_status,
         ]
         if is_new_record:
             self.sheet.append_row(
                 [domain_input.company_name, domain_input.company_url, *row],
-                table_range="A:M",
+                table_range="A:Q",
             )
         else:
-            self.sheet.update([row], f"C{domain_input.row_no}:M{domain_input.row_no}")
+            self.sheet.update([row], f"C{domain_input.row_no}:Q{domain_input.row_no}")
 
 
 class ProductionSheetStrategy(BaseSheetStrategy):
@@ -231,10 +235,14 @@ class ProductionSheetStrategy(BaseSheetStrategy):
                 output.ecommerce_platform,
                 output.lead_status,
                 output.revenue,
+                output.shipping_messaging,
+                output.shipping_methods,
+                output.carriers,
+                output.product_size_weight,
                 output.redirected_to,
                 datetime.datetime.now().strftime("%m-%d-%Y"),
             ],
-            table_range="A:N",
+            table_range="A:P",
         )
 
     def _load_history_domains(self) -> set[str]:

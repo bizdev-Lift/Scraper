@@ -40,3 +40,7 @@ class DomainResponse:
     revenue: float | None = None
     redirected_to: str | None = None
     old_lead_status: str | None = None
+    shipping_messaging: list[str] | None = None
+    shipping_methods: str | None = None
+    carriers: list[str] | None = None
+    product_size_weight: str | None = None
