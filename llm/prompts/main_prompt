@@ -355,30 +355,30 @@ Miva Merchant, Web Shop Manager, Cart Functionality, Ecwid, Squarespace, Wix, Sm
 *Answer: [Platform Name] or "N/A"*
 
 ### 8. Important Links (json_key: links)
-**Question:** What are the key navigation links (up to 2) based on priority?
+**Question:** What are the key navigation links (up to 3) based on priority?
 
 **Priority Order:**
-1.  About Us / About pages
-2.  Contact Us / Contact pages
-3.  Customer Service pages
-4.  Customer Support pages
+1. About Us / About pages
+2. Contact Us / Contact pages
+3. Shipping / Delivery / Returns / Payment related pages
 
 **Requirements:**
-- Extract up to 2 links maximum
-- Only extract relative URLs
-- Return as array/list format
-- No duplicates
-- Must be actual clickable links from the page and should be from the priority order.
-- We don't need links other than what is mentioned in Priority Order.
+- Extract up to 3 links — one per priority category if available
+- Only relative URLs, no duplicates
+- ⛔ MUST always scan for all 3 priorities even if first 2 are already found
+
+**Identifying a shipping page (in order):**
+1. Link text contains: "shipping", "delivery", "returns", "freight", "postage"
+2. URL matches: `/shipping`, `/delivery`, `/payment-delivery`, `/returns`, `/shipping-policy`, `/shipping-returns`, `/payment`, `/info`, `/faq`, `/help`, `/policies`
+3. For generic URLs like `/info`, `/faq`, `/help` — extract even if link text doesn't mention shipping, as these pages often contain shipping details
 
 **Example:**
+- **Valid:** `"/about-us"`, `"/contact"`, `"/info"`
+- **Invalid:** `"https://example.com/about"`, `"mailto:info@example.com"`
 
-- **Valid:** `"/about-us"`, `"/contact"`
--  **Invalid:** `"https://example.com/about"`, `"mailto:info@example.com"`
+**CRITICAL: DO NOT consider hidden elements (`display: none`, `visibility: hidden`) or their children.**
 
-**CRITICAL: DO NOT consider elements with `display: none;`, `visibility: hidden;`, or similar styling that hides content from the user OR if any PARENT element has `display: none;`, `visibility: hidden;`, or similar styling.**
-
-*Answer: [Array of up to 2 URLs]*
+*Answer: [Array of up to 3 URLs]*
 
 ### 9. US Based (json_key: is_us_based)
 **Question:** Is this company verifiably US-based?
@@ -413,6 +413,106 @@ Miva Merchant, Web Shop Manager, Cart Functionality, Ecwid, Squarespace, Wix, Sm
 *Answer: Yes/No*
 
 
+### 11. Shipping Messaging (json_key: shipping_messaging)
+**Question:** What shipping-related messaging is visible on the page? Select ALL that apply.
+
+**Categories — understand the INTENT of the text, not just the exact words. Return all that match:**
+
+| Category | Return when you find text that MEANS... | Example phrases (not exhaustive) |
+|---|---|---|
+| `"Free Shipping Threshold"` | Free shipping is offered, but only when an order meets a minimum dollar amount or quantity | "free shipping on orders over $50", "spend $75 for free shipping", "free delivery on orders above $100" |
+| `"Free Shipping Domestic Always"` | Shipping is always free with no conditions or minimums | "free shipping on all orders", "always free shipping", "we ship free", "shipping is on us" |
+| `"Calculated at Checkout"` | The shipping cost is not shown upfront and will be determined during the checkout process | "shipping calculated at checkout", "rates determined at checkout", "see shipping cost at checkout" |
+| `"Express Shipping Available"` | A faster-than-standard shipping option is available | "express shipping", "overnight delivery", "2-day shipping", "expedited shipping", "priority shipping", "next day delivery" |
+| `"Flat Rate"` | A fixed shipping fee applies — regardless of whether the phrase "flat rate" is used. Any text stating a specific dollar amount charged for shipping a category of orders qualifies | "flat rate shipping $5", "$20 shipping charge for all domestic orders", "international orders subject to $30 shipping fee", "we charge $8 for shipping" |
+| `"LTL / Trucking"` | Products are shipped via freight, truck, or LTL carriers due to size or weight | "LTL shipping", "freight delivery", "truck delivery", "ships via freight", "trucking", "oversized item shipping" |
+| `"Local Pickup"` | Customers can collect their order in person instead of having it shipped | "local pickup", "in-store pickup", "in-store pick up", "pick up at store", "BOPIS", "collect in store", "curbside pickup", "store collection" |
+
+**Return `"N/A"` ONLY if no shipping-related messaging of any kind is visible on the page.**
+
+**Critical instructions:**
+- Match by **meaning, not exact wording** — ask: "Does this tell the customer anything about how, when, at what cost, or under what conditions their order will be sent or collected?" If yes, classify it. If no, return N/A.
+- A dollar threshold only qualifies if tied to a **shipping benefit** — not gifts, discounts, or other promotions.
+- `shipping_messaging` and `shipping_methods` are **independent fields** — evaluate them separately.
+- Return **ALL** matching categories as a comma-separated string.
+
+⛔ **Reasoning — one line, no exceptions:**
+- N/A → `"No shipping-related messaging found."`
+- Match → `"[Category]: '[exact triggering text]'"`
+
+
+*Answer: comma-separated categories in string, or N/A*
+
+### 12. Shipping Methods (json_key: shipping_methods)
+**Question:** What shipping destinations does this company support?
+
+**Detection rules:**
+- Return `"International"` if ANY of the following are found in visible text:
+  - Explicit mention of international shipping or worldwide shipping
+  - Country names or regions outside the US mentioned as shipping destinations
+  - Mention of customs, duties, or import fees (these strongly indicate international shipping)
+  - Currency selectors showing non-USD currencies in a shipping context
+- Return `"Domestic Only"` if the page explicitly states shipping is limited to the US only
+- Return `"N/A"` if there is no shipping destination information visible on the page
+
+**Note:** Mention of customs or duties alone is sufficient to classify as International — companies dealing with customs are almost always shipping internationally.
+
+**CRITICAL: DO NOT consider elements with `display: none;`, `visibility: hidden;`, or similar styling.**
+
+*Answer: "International" or "Domestic Only" or "N/A"*
+
+### 13. Carriers (json_key: carriers)
+**Question:** What shipping carriers are explicitly mentioned on the page?
+
+**Scan visible text for the following carrier names:**
+- USPS
+- UPS
+- FedEx
+- DHL
+- Amazon Logistics
+- OnTrac
+- LaserShip / LSO
+- GSO (Golden State Overnight)
+- XPO Logistics
+- Estes Express
+- Old Dominion (ODFL)
+- Saia
+- R+L Carriers
+- ABF Freight
+- Aramex
+- Canada Post
+- Royal Mail
+- Australia Post
+- Deutsche Post
+
+**Rules:**
+- Return ALL carriers found as a comma separated string
+- Only include carriers explicitly mentioned by name in visible text
+- Do NOT infer carriers from logos alone unless the logo has visible alt text or a label
+- Return e if no carriers are mentioned
+
+*Answer: comma separated carrier names or N/A*
+
+### 14. Product Size / Weight (json_key: product_size_weight)
+**Question:** Based on visible product descriptions and page content, what best describes the size and weight profile of the products sold?
+
+**Classification rules — pick the BEST match from visible content:**
+ 
+- **Lightweight / Standard** — everyday consumer products with no size or weight callouts. Examples: clothing, accessories, small electronics, cosmetics, books, small home goods
+- **Heavy / Bulky** — explicit mentions of heavy, oversized, or large format products. Look for: "heavy duty", "oversized", "large format", "bulky", product weights listed in lbs/kg suggesting heavy items, large dimensions mentioned
+- **Industrial / Wholesale** — commercial grade or industrial scale products. Look for: "industrial", "commercial grade", "bulk quantities", "wholesale", machinery, heavy equipment, raw materials
+- **N/A** — insufficient information on the pages visited to determine product size/weight profile. This is expected when product pages are not visited.
+
+**Important notes:**
+- This is inferred from context only — we do not visit product pages specifically for this field
+- If the page has limited product information, default to N/A rather than guessing
+- Homepage and about/contact pages may not always have enough product detail to classify accurately
+
+**CRITICAL: DO NOT consider elements with `display: none;`, `visibility: hidden;`, or similar styling.**
+
+*Answer: "Lightweight / Standard" or "Heavy / Bulky" or "Industrial / Wholesale" or "N/A"*
+
+
 ## Critical Guidelines:
 1. **JSON Only**: Only JSON response will be accepted. I have already explained the key names above so the output returned by gemini should be a JSON.
 2. **REASONING**: I need a *reasoning* key at the end that will contain *ONE LINER* reasoning for every above key e.g.
@@ -425,6 +525,14 @@ Miva Merchant, Web Shop Manager, Cart Functionality, Ecwid, Squarespace, Wix, Sm
 
     - For b2c_sales and b2b_sales, the reasoning must include the literal text string or HTML attribute (e.g., id="add-to-cart-button" or text="Wholesale Login") that triggered the 'Yes' response. If 'No', the reasoning must state: 'No functional purchase/wholesale elements found in visible HTML text or attributes.
     - DO NOT mark b2c_sales as 'Yes' solely based on the presence of a price tag ($), a 'Shop' menu link, or a 'Product' gallery. Many B2B sites show prices but require a login or phone call to purchase. Only 'Add to Cart', 'Buy Now', or a functional 'Checkout' path counts."
+    - For links, the reasoning MUST explicitly state:
+      1. Whether a shipping/delivery/returns page was found or not
+      2. If found, why it was or wasn't included
+      3. If not found, confirmation that the full page was scanned for shipping-related link text and URL patterns
+    - For shipping_messaging, reasoning must quote the exact visible text that triggered each category, OR if N/A, state in one line: "No shipping-related messaging found." Do not explain what was searched for or what was absent.
+    - For carriers, reasoning must quote the exact text where each carrier name was found
+    - For shipping_methods, reasoning must quote the exact text or signal that determined the value
+    - For product_size_weight, reasoning must reference the specific product descriptions or keywords used to classify
 2. **Visible Content Only:** Base ALL answers exclusively on content that is visible in the provided HTML. **CHECK THE CLASSES AND MAKE SURE THEY DON'T HAVE `display: none` OR `visibility: hidden` IN THEM, EITHER DIRECTLY IN THE STYLE ATTRIBUTE OR IN A CSS CLASS. ALSO, ENSURE THAT NO PARENT ELEMENT OF THE TAG HAS THESE STYLES APPLIED.** This is the MOST IMPORTANT RULE.
 
 3. **No Assumptions:** Don't infer or guess. If information isn't explicitly visible and meeting the criteria, answer accordingly (No, N/A, or empty string).
@@ -462,6 +570,11 @@ Confirm verbatim surrounding text actually contains the stated trigger/keyword a
 **Step 5 — lead_status consistency check:**
 If `lead_status` is "Unqualified – Junk Lead / No Shipping" but top-level `b2c_sales` is "Yes" OR top-level `b2b_sales` is "Yes" → this is a contradiction. You MUST change `lead_status` to "Lift Prime" (assuming website is active and US-based). A Junk Lead can only be assigned when BOTH b2c_sales AND b2b_sales are "No".
 
+**Step 6 — New fields consistency check:**
+- shipping_messaging must be an array, never a single string (except ["Not Mentioned"])
+- carriers must be an array, never a single string (use [] if none found)
+- product_size_weight must be one of the four defined values, never free text
+- shipping_methods must be exactly one of the three defined values
 ---
 
 **Final Verification Checklist:**
