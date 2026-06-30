@@ -64,7 +64,7 @@ class GoogleSheetsHandler:
     def update_stats(self, record: list[str]):
         self.stats_sheet.append_row(
             [*record, datetime.datetime.now().strftime("%m-%d-%Y")],
-            table_range="A:F",
+            table_range="A1",
         )
 
 
@@ -163,7 +163,7 @@ class RegularSheetStrategy(BaseSheetStrategy):
         if is_new_record:
             self.sheet.append_row(
                 [domain_input.company_name, domain_input.company_url, *row],
-                table_range="A:R",
+                table_range="A1"
             )
         else:
             self.sheet.update([row], f"C{domain_input.row_no}:R{domain_input.row_no}")
@@ -204,13 +204,13 @@ class ProductionSheetStrategy(BaseSheetStrategy):
         return record.company_url.lower() in self.history_domains
 
     def on_skip(self, record: DomainInput) -> None:
-        self.skip_sheet.append_row([record.company_url], table_range="A:B")
+        self.skip_sheet.append_row([record.company_url], table_range="A1")
 
     def on_success(self, record: DomainInput, output: DomainResponse) -> None:
         self._append(self.good_sheet, record, output)
 
     def on_error(self, record: DomainInput, output: DomainResponse) -> None:
-        self._append(self.error_sheet, record, output)
+        self._append(self.error_sheet, record, output, status="error")
 
     def on_complete(self, records: list[DomainInput]) -> None:
         row_numbers = sorted([r.row_no for r in records], reverse=True)
@@ -223,30 +223,34 @@ class ProductionSheetStrategy(BaseSheetStrategy):
         sheet: gspread.Worksheet,
         domain_input: DomainInput,
         output: DomainResponse,
+        status: str = "success"
     ) -> None:
-        sheet.append_row(
-            [
-                domain_input.company_url,
-                output.hq_phone_no,
-                output.website_availability,
-                output.hq_address_listed,
-                output.b2c_sales,
-                output.b2b_sales,
-                output.industry_classification,
-                output.ecommerce_platform,
-                output.lead_status,
-                output.revenue,
-                output.shipping_messaging,
-                output.shipping_methods,
-                output.carriers,
-                output.product_size_weight,
-                output.redirected_to,
+        record = [
+            domain_input.company_url,
+            output.hq_phone_no,
+            output.website_availability,
+            output.hq_address_listed,
+            output.b2c_sales,
+            output.b2b_sales,
+            output.industry_classification,
+            output.ecommerce_platform,
+            output.lead_status,
+            output.revenue,
+            output.shipping_messaging,
+            output.shipping_methods,
+            output.carriers,
+            output.product_size_weight,
+            output.product_dimensions,
+            output.redirected_to,
+        ]
+        if status == "success":
+            record.extend([
                 *list(asdict(output.apollo_result).values()),
                 *list(asdict(output.seamless_result).values()),
-                datetime.datetime.now().strftime("%m-%d-%Y"),
-            ],
-            table_range="A:AM",
-        )
+            ])
+
+        record.append(datetime.datetime.now().strftime("%m-%d-%Y"))
+        sheet.append_row(record, table_range="A1")
 
     def _load_history_domains(self) -> set[str]:
         info = self.handler.spreadsheet_info

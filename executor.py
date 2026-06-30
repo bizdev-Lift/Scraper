@@ -40,14 +40,13 @@ class MainExecutor:
             domains = [record.company_url for record in records]
             self.apollo_results = self.apollo_api.enrich_leads(domains)
             self.seamless_results = self.seamless_api.enrich_leads(domains)
-
         for record in records:
-            if (
-                isinstance(self.strategy, ProductionSheetStrategy)
-                and self.strategy.is_seen(record)
-            ):
-                self.strategy.on_skip(record)
-                continue
+            # if (
+            #     isinstance(self.strategy, ProductionSheetStrategy)
+            #     and self.strategy.is_seen(record)
+            # ):
+            #     self.strategy.on_skip(record)
+            #     continue
 
             output = self._process_record(record)
             if output:

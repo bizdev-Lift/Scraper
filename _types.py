@@ -27,10 +27,10 @@ class DomainInput:
 
 @dataclass
 class ApolloResult:
-    company_name: str
-    num_of_employees: str
-    industry: str
-    website: str
+    company_name: str | None = None
+    num_of_employees: str | None = None
+    industry: str | None = None
+    website: str | None = None
     company_linkedin_url: str | None = None
     company_state: str | None = None
     company_country: str | None = None

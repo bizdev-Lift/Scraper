@@ -23,7 +23,10 @@ class HubSpotCompaniesClient:
         Chunks into batches of 5 (HubSpot filterGroups limit).
         """
         found = set()
- 
+
+        if not domains:
+            return found
+
         # Process in chunks of 5 (HubSpot max filterGroups per request)
         # for i in range(0, len(domains), 20):
         # chunk = domains[i:i + 5]
