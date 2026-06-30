@@ -1,5 +1,5 @@
 import requests
-import re
+import base64
 import json
 import random
 import os
@@ -9,6 +9,7 @@ from typing import Union
 from _types import DomainResponse
 from config import settings
 from llm._types import GeminiResponse, GeminiChatCompletion
+from llm.image_parsing import create_image_parts
 from llm.utils import _clean_llm_response_json_data
 from logger import logger
 from io_operations.google_sheets import GoogleSheetsHandler
@@ -43,7 +44,11 @@ class LLMHelper:
         count = 2
         while count > 0:
             completion = self.get_summary(
-                input_html, self.MAIN_PROMPT, company_url=url, thinking_level="MEDIUM"
+                input_html,
+                self.MAIN_PROMPT,
+                page_name=page_name,
+                company_url=url,
+                thinking_level="MEDIUM",
             )
             completion_error = completion.get("error")
             if not completion_error:
@@ -83,7 +88,9 @@ class LLMHelper:
         completion_tokens = chat_completion.completion_tokens()
         cost = chat_completion.cost(prompt_tokens, completion_tokens)
         if settings.environment != "dev":
-            self.sheets_handler.update_stats([url, page_name, prompt_tokens, completion_tokens, cost])
+            self.sheets_handler.update_stats(
+                [url, page_name, prompt_tokens, completion_tokens, cost]
+            )
         logger.info(
             f"Total tokens used for url {url} against ({page_name}):\n"
             f"Prompt Tokens: {prompt_tokens}, Completion Tokens: {completion_tokens}"
@@ -118,7 +125,9 @@ class LLMHelper:
         prompt_tokens = chat_completion.prompt_tokens()
         completion_tokens = chat_completion.completion_tokens()
         cost = chat_completion.cost(prompt_tokens, completion_tokens)
-        self.sheets_handler.update_stats([company_url, page_name, prompt_tokens, completion_tokens, cost])
+        self.sheets_handler.update_stats(
+            [company_url, page_name, prompt_tokens, completion_tokens, cost]
+        )
         logger.info(
             f"Total tokens used for google_url {url}:\n"
             f"Prompt Tokens: {prompt_tokens}, Completion Tokens: {completion_tokens}"
@@ -151,17 +160,23 @@ class LLMHelper:
         self,
         input_html: str,
         prompt_name: str,
+        page_name: str | None = None,
         company_url: str | None = None,
         thinking_level: str = "MINIMAL",
         temperature: float = 1.0,
     ) -> dict:
+        image_parts = []
+        if page_name and page_name == "Homepage":
+            image_parts = create_image_parts(company_url, input_html)
+
         prompt = self.read_prompt(prompt_name)
         prompt = prompt.replace("{{CONTENT}}", input_html)
+
         if company_url:
             prompt = prompt.replace("{{SITE_URL}}", company_url)
 
         response = self.make_gemini_request(
-            prompt, thinking_level=thinking_level, temperature=temperature
+            prompt, image_parts, thinking_level=thinking_level, temperature=temperature
         )
 
         logger.info(response.status_code)
@@ -195,7 +210,9 @@ class LLMHelper:
         b2b_reasoning = reasoning.get("b2b_sales", {})
         if isinstance(b2b_reasoning, dict):
             b2b_keyword = b2b_reasoning.get("b2b_sales_keyword_found", "None").strip()
-            b2b_verbatim = b2b_reasoning.get("b2b_sales_verbatim_surrounding_text", "N/A").strip()
+            b2b_verbatim = b2b_reasoning.get(
+                "b2b_sales_verbatim_surrounding_text", "N/A"
+            ).strip()
             b2b_conclusion = b2b_reasoning.get("b2b_sales_conclusion", "No").strip()
 
             # Contradiction check: keyword claimed found but no verbatim text to prove it
@@ -208,9 +225,13 @@ class LLMHelper:
                 )
                 b2b_conclusion = "No"
                 data["reasoning"]["b2b_sales"]["b2b_sales_keyword_found"] = "None"
-                data["reasoning"]["b2b_sales"]["b2b_sales_verbatim_surrounding_text"] = "N/A"
+                data["reasoning"]["b2b_sales"][
+                    "b2b_sales_verbatim_surrounding_text"
+                ] = "N/A"
                 data["reasoning"]["b2b_sales"]["b2b_sales_location"] = "N/A"
-                data["reasoning"]["b2b_sales"]["b2b_sales_not_in_blog_or_product_name"] = "N/A"
+                data["reasoning"]["b2b_sales"][
+                    "b2b_sales_not_in_blog_or_product_name"
+                ] = "N/A"
                 data["reasoning"]["b2b_sales"]["b2b_sales_not_hidden"] = "N/A"
                 data["reasoning"]["b2b_sales"]["b2b_sales_conclusion"] = "No"
 
@@ -223,9 +244,13 @@ class LLMHelper:
                     )
                     b2b_conclusion = "No"
                     data["reasoning"]["b2b_sales"]["b2b_sales_keyword_found"] = "None"
-                    data["reasoning"]["b2b_sales"]["b2b_sales_verbatim_surrounding_text"] = "N/A"
+                    data["reasoning"]["b2b_sales"][
+                        "b2b_sales_verbatim_surrounding_text"
+                    ] = "N/A"
                     data["reasoning"]["b2b_sales"]["b2b_sales_location"] = "N/A"
-                    data["reasoning"]["b2b_sales"]["b2b_sales_not_in_blog_or_product_name"] = "N/A"
+                    data["reasoning"]["b2b_sales"][
+                        "b2b_sales_not_in_blog_or_product_name"
+                    ] = "N/A"
                     data["reasoning"]["b2b_sales"]["b2b_sales_not_hidden"] = "N/A"
                     data["reasoning"]["b2b_sales"]["b2b_sales_conclusion"] = "No"
 
@@ -247,10 +272,18 @@ class LLMHelper:
             # or if it was Junk Lead but now at least one sales field is Yes
             if b2c == "No" and b2b == "No" and lead_status == "Lift Prime":
                 data["lead_status"] = "Unqualified – Junk Lead / No Shipping"
-                changes.append("lead_status overridden: 'Lift Prime' → 'Unqualified – Junk Lead / No Shipping'")
-            elif (b2c == "Yes" or b2b == "Yes") and website_up and lead_status == "Unqualified – Junk Lead / No Shipping":
+                changes.append(
+                    "lead_status overridden: 'Lift Prime' → 'Unqualified – Junk Lead / No Shipping'"
+                )
+            elif (
+                (b2c == "Yes" or b2b == "Yes")
+                and website_up
+                and lead_status == "Unqualified – Junk Lead / No Shipping"
+            ):
                 data["lead_status"] = "Lift Prime"
-                changes.append("lead_status overridden: 'Unqualified – Junk Lead / No Shipping' → 'Lift Prime'")
+                changes.append(
+                    "lead_status overridden: 'Unqualified – Junk Lead / No Shipping' → 'Lift Prime'"
+                )
 
         return data, changes
 
@@ -262,10 +295,13 @@ class LLMHelper:
     def make_gemini_request(
         self,
         input_content: str,
+        image_parts: list[str],
         thinking_level: str = "MINIMAL",
         temperature: float = 0.2,
     ) -> requests.Response:
-        return requests.post(
+        contents = [{"parts": [{"text": input_content}, *image_parts]}]
+
+        response = requests.post(
             self.base_url,
             headers={"Content-Type": "application/json"},
             data=json.dumps(
@@ -277,15 +313,7 @@ class LLMHelper:
                             }
                         ]
                     },
-                    "contents": [
-                        {
-                            "parts": [
-                                {
-                                    "text": input_content,
-                                }
-                            ]
-                        }
-                    ],
+                    "contents": contents,
                     "tools": [{"google_search": {}}],
                     "generationConfig": {
                         "temperature": temperature,
@@ -297,3 +325,4 @@ class LLMHelper:
                 }
             ),
         )
+        return response

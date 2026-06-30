@@ -512,6 +512,39 @@ Miva Merchant, Web Shop Manager, Cart Functionality, Ecwid, Squarespace, Wix, Sm
 
 *Answer: "Lightweight / Standard" or "Heavy / Bulky" or "Industrial / Wholesale" or "N/A"*
 
+### 15. Estimated Packaging Sizes (json_key: product_dimensions)
+**Question:** For each product identified, provide an ESTIMATED shipping/packaging box size (L x W x H).
+
+**APPLICABILITY CHECK — run this FIRST:**
+- If `b2c_sales` is "No" AND `b2b_sales` is "No" → return `"N/A"` immediately (no physical products being sold).
+- If `bad_product_type` is "Yes" with category "Service-based businesses" → return `"N/A"` immediately.
+- If no images were provided → return `"N/A"`.
+- Otherwise, proceed.
+
+**Instructions:**
+- This field allows estimation and general knowledge.
+- Base the estimate on whichever of these are available, in order of preference:
+  1. Visible weight/volume/size text (from section 15 or HTML) + typical packaging conventions for that product category
+  2. Visual analysis of the image alone — use the product's apparent shape, type, recognizable container format (e.g. standard bottle, can, box, bag), and relative proportions to estimate real-world size
+- Even with no visible text at all, provide your best visual estimate based on what the product appears to be (e.g. "looks like a standard 500ml bottle" → estimate accordingly).
+- Use inches unless context suggests metric.
+- Only return "N/A" if the image is too unclear/cropped to identify the product type at all.
+
+**OUTPUT CONSOLIDATION — IMPORTANT:**
+- Do NOT return a separate estimate per individual product/variant name.
+- Instead, group all visible products by approximate size/type, then return ONLY:
+  - The SMALLEST typical packaging dimensions across all products (for the smallest item type)
+  - The LARGEST typical packaging dimensions across all products (for the largest item type)
+- If all products are roughly the same size/category, return a SINGLE estimate (smallest = largest, just one value).
+
+**OUTPUT FORMAT — STRICT:**
+`product_dimensions` MUST be a single string in ONE of these formats:
+- If sizes vary: `"Smallest: L x W x H in, Largest: L x W x H in"`
+- If all products are similar size: `"L x W x H in"`
+- If not applicable: `"N/A"`
+
+**Example of CORRECT output (varied sizes):**
+- "product_dimensions": "12 x 8 x 5 in"
 
 ## Critical Guidelines:
 1. **JSON Only**: Only JSON response will be accepted. I have already explained the key names above so the output returned by gemini should be a JSON.
@@ -533,6 +566,8 @@ Miva Merchant, Web Shop Manager, Cart Functionality, Ecwid, Squarespace, Wix, Sm
     - For carriers, reasoning must quote the exact text where each carrier name was found
     - For shipping_methods, reasoning must quote the exact text or signal that determined the value
     - For product_size_weight, reasoning must reference the specific product descriptions or keywords used to classify
+    - For product_dimensions, state the applicability check result. If proceeding, briefly describe the range of product types/sizes observed and how the smallest/largest (or single uniform) estimate was derived.
+
 2. **Visible Content Only:** Base ALL answers exclusively on content that is visible in the provided HTML. **CHECK THE CLASSES AND MAKE SURE THEY DON'T HAVE `display: none` OR `visibility: hidden` IN THEM, EITHER DIRECTLY IN THE STYLE ATTRIBUTE OR IN A CSS CLASS. ALSO, ENSURE THAT NO PARENT ELEMENT OF THE TAG HAS THESE STYLES APPLIED.** This is the MOST IMPORTANT RULE.
 
 3. **No Assumptions:** Don't infer or guess. If information isn't explicitly visible and meeting the criteria, answer accordingly (No, N/A, or empty string).
@@ -584,3 +619,5 @@ If `lead_status` is "Unqualified – Junk Lead / No Shipping" but top-level `b2c
 - [ ] All elements considered and their parent elements verified for hidden styling
 - [ ] Format matches requirements exactly
 - [ ] No null/None values returned
+- [ ] product_dimensions only contains text literally visible/legible in the provided images — no estimation based on visual size comparison
+

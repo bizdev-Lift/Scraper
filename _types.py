@@ -26,6 +26,37 @@ class DomainInput:
 
 
 @dataclass
+class ApolloResult:
+    company_name: str
+    num_of_employees: str
+    industry: str
+    website: str
+    company_linkedin_url: str | None = None
+    company_state: str | None = None
+    company_country: str | None = None
+    company_postal_code: str | None = None
+    company_phone: str | None = None
+    annual_revenue: str | None = None
+    num_of_retail_locations: str | None = None
+    short_description: str | None = None
+
+
+@dataclass
+class SeamlessResult:
+    company_name: str | None = None
+    website: str | None = None
+    industry: str | None = None
+    num_of_employees: str | None = None
+    revenue_range: str | None = None
+    annual_revenue: str | None = None
+    company_state_abbr: str | None = None
+    company_postal_code: str | None = None
+    company_country: str | None = None
+    company_linkedin_url: str | None = None
+    short_description: str | None = None
+
+
+@dataclass
 class DomainResponse:
     hq_phone_no: str
     website_availability: Literal["Yes", "No"]
@@ -44,3 +75,6 @@ class DomainResponse:
     shipping_methods: str | None = None
     carriers: list[str] | None = None
     product_size_weight: str | None = None
+    product_dimensions: str | None = None
+    apollo_result: ApolloResult | None = None
+    seamless_result: SeamlessResult | None = None

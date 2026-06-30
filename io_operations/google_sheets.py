@@ -6,7 +6,7 @@ import datetime
 
 from oauth2client.service_account import ServiceAccountCredentials
 from abc import ABC, abstractmethod
-
+from dataclasses import asdict
 from _types import GoogleSheetInfo, DomainInput, DomainResponse
 from config import settings
 from hubspot.records_api import HubSpotCompaniesClient
@@ -156,16 +156,17 @@ class RegularSheetStrategy(BaseSheetStrategy):
             output.shipping_methods,
             output.carriers,
             output.product_size_weight,
+            output.product_dimensions,
             output.redirected_to,
             output.old_lead_status,
         ]
         if is_new_record:
             self.sheet.append_row(
                 [domain_input.company_name, domain_input.company_url, *row],
-                table_range="A:Q",
+                table_range="A:R",
             )
         else:
-            self.sheet.update([row], f"C{domain_input.row_no}:Q{domain_input.row_no}")
+            self.sheet.update([row], f"C{domain_input.row_no}:R{domain_input.row_no}")
 
 
 class ProductionSheetStrategy(BaseSheetStrategy):
@@ -240,9 +241,11 @@ class ProductionSheetStrategy(BaseSheetStrategy):
                 output.carriers,
                 output.product_size_weight,
                 output.redirected_to,
+                *list(asdict(output.apollo_result).values()),
+                *list(asdict(output.seamless_result).values()),
                 datetime.datetime.now().strftime("%m-%d-%Y"),
             ],
-            table_range="A:P",
+            table_range="A:AM",
         )
 
     def _load_history_domains(self) -> set[str]:

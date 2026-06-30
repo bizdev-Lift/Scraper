@@ -20,7 +20,6 @@ cleaner = BodyCleaner(
     inline_style=True,
     add_nofollow=True,
     kill_tags=(
-        "img",
         "input",
         "video",
         "cite",
@@ -30,6 +29,7 @@ cleaner = BodyCleaner(
         "noscript",
     ),
     allow_tags=(
+        "img",
         "p",
         "h1",
         "h2",

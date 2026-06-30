@@ -4,6 +4,8 @@ from typing import Any, Optional, Tuple
 
 import tldextract
 
+from apollo.companies_search import ApolloAPI
+from seamless.companies_search import SeamlessAPI
 from io_operations.google_sheets import GoogleSheetsHandler, RegularSheetStrategy, ProductionSheetStrategy
 from _types import DomainResponse, DomainInput
 from scraper.generic_scraper import GenericScraper
@@ -27,9 +29,18 @@ class MainExecutor:
         self.scraper = GenericScraper(s3_bucket_name=bucket_name)
         self.llm_helper = LLMHelper(handler)
         self.bot_scraper = BotScraper(s3_bucket_name=bucket_name)
+        self.apollo_api = ApolloAPI()
+        self.seamless_api = SeamlessAPI()
+        self.apollo_results = []
+        self.seamless_results = []
 
     def run(self) -> None:
         records = self.strategy.get_records()
+        if isinstance(self.strategy, ProductionSheetStrategy):
+            domains = [record.company_url for record in records]
+            self.apollo_results = self.apollo_api.enrich_leads(domains)
+            self.seamless_results = self.seamless_api.enrich_leads(domains)
+
         for record in records:
             if (
                 isinstance(self.strategy, ProductionSheetStrategy)
@@ -72,7 +83,7 @@ class MainExecutor:
             PageRequest(url=f"https://www.{record.company_url}"),
         ]
         parsed_response, domain_url, is_blocked = self.process(
-            record, page_requests, get_first_successful_response=True
+            record, page_requests, get_first_successful_response=True, page_name="Homepage"
         )
         domain_url = domain_url.rstrip("/") if domain_url else domain_url
 
@@ -122,6 +133,10 @@ class MainExecutor:
 
         if redirected_to:
             merged_summary.redirected_to = redirected_to
+
+        if isinstance(self.strategy, ProductionSheetStrategy):
+            merged_summary.apollo_result = self.apollo_results[record.company_url]
+            merged_summary.seamless_result = self.seamless_results[record.company_url]
 
         logger.info(f"Summary extracted against url={website_url}.")
         return merged_summary
@@ -231,7 +246,9 @@ class MainExecutor:
         use_bot: bool = False,
         retry: bool = True,
         get_first_successful_response: bool = False,
+        page_name: str | None = None
     ) -> Tuple[Optional[str], Optional[str], bool]:
+        # if page_name == "Homepage" or use_bot:
         if use_bot:
             self.bot_scraper.start()
             parsed_responses, domain_url = self.bot_scraper.run(

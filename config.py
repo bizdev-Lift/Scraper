@@ -12,7 +12,7 @@ class Settings:
         "https://www.googleapis.com/auth/spreadsheets",
         "https://www.googleapis.com/auth/drive",
     ]
-    hubspot_api_key: str = os.environ["HUBSPOT_API_KEY"]
+    hubspot_api_key: str = os.environ.get("HUBSPOT_API_KEY")
     spreadsheet_info: GoogleSheetInfo = GoogleSheetInfo(
         spreadsheet_id=os.environ["SPREADSHEET_ID"],
         sheet_name=os.environ["SHEET_NAME"],
@@ -32,6 +32,8 @@ class Settings:
     zyte_enabled: bool = os.getenv("ZYTE_ENABLED", "false").lower() == "true"
     zyte_url: str = "https://api.zyte.com/v1/extract"
     zyte_api_key: str = os.environ["ZYTE_API_KEY"]
+    apollo_api_key: str = os.environ["APOLLO_API_KEY"]
+    seamless_api_key: str = os.environ["SEAMLESS_API_KEY"]
 
 
 settings = Settings()
