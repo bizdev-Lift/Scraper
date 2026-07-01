@@ -4,6 +4,7 @@ import copy
 import re
 import datetime
 
+from typing import Literal
 from oauth2client.service_account import ServiceAccountCredentials
 from abc import ABC, abstractmethod
 from dataclasses import asdict
@@ -204,7 +205,7 @@ class ProductionSheetStrategy(BaseSheetStrategy):
         return record.company_url.lower() in self.history_domains
 
     def on_skip(self, record: DomainInput) -> None:
-        self.skip_sheet.append_row([record.company_url], table_range="A1")
+        self._append(self.error_sheet, record, [record.company_url], status="skip")
 
     def on_success(self, record: DomainInput, output: DomainResponse) -> None:
         self._append(self.good_sheet, record, output)
@@ -223,33 +224,44 @@ class ProductionSheetStrategy(BaseSheetStrategy):
         sheet: gspread.Worksheet,
         domain_input: DomainInput,
         output: DomainResponse,
-        status: str = "success"
+        status: Literal["success", "skip", "error"] = "success"
     ) -> None:
-        record = [
-            domain_input.company_url,
-            output.hq_phone_no,
-            output.website_availability,
-            output.hq_address_listed,
-            output.b2c_sales,
-            output.b2b_sales,
-            output.industry_classification,
-            output.ecommerce_platform,
-            output.lead_status,
-            output.revenue,
-            output.shipping_messaging,
-            output.shipping_methods,
-            output.carriers,
-            output.product_size_weight,
-            output.product_dimensions,
-            output.redirected_to,
-        ]
+        scrape_date = datetime.datetime.now().strftime("%m-%d-%Y")
         if status == "success":
-            record.extend([
+            record = [
+                domain_input.company_url,
+                domain_input.company_url,
+                domain_input.company_url,
+                output.hq_phone_no,
+                output.website_availability,
+                output.hq_address_listed,
+                output.b2c_sales,
+                output.b2b_sales,
+                output.industry_classification,
+                output.ecommerce_platform,
+                output.lead_status,
+                output.revenue,
+                output.shipping_messaging,
+                output.shipping_methods,
+                output.carriers,
+                output.product_size_weight,
+                output.product_dimensions,
+                output.redirected_to,
                 *list(asdict(output.apollo_result).values()),
                 *list(asdict(output.seamless_result).values()),
-            ])
+                scrape_date
+            ]
+        elif status == "error":
+            record = [
+                domain_input.company_url,
+                output.lead_status,
+                scrape_date
+            ]
+        elif status == "skip":
+            record = [domain_input.company_url, scrape_date]
+        else:
+            logger.error(f"Invalid scrape status. Not saving anything in google sheets for {domain_input.company_url}")
 
-        record.append(datetime.datetime.now().strftime("%m-%d-%Y"))
         sheet.append_row(record, table_range="A1")
 
     def _load_history_domains(self) -> set[str]:
