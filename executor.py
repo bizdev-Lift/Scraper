@@ -1,5 +1,6 @@
 import time
 import os
+import re
 from typing import Any, Optional, Tuple
 
 import tldextract
@@ -7,7 +8,7 @@ import tldextract
 from apollo.companies_search import ApolloAPI
 from seamless.companies_search import SeamlessAPI
 from io_operations.google_sheets import GoogleSheetsHandler, RegularSheetStrategy, ProductionSheetStrategy
-from _types import DomainResponse, DomainInput
+from _types import DomainResponse, DomainInput, ApolloResult, SeamlessResult
 from scraper.generic_scraper import GenericScraper
 from scraper._types import PageRequest
 from llm.llm_helpers import LLMHelper
@@ -41,12 +42,12 @@ class MainExecutor:
             self.apollo_results = self.apollo_api.enrich_leads(domains)
             self.seamless_results = self.seamless_api.enrich_leads(domains)
         for record in records:
-            # if (
-            #     isinstance(self.strategy, ProductionSheetStrategy)
-            #     and self.strategy.is_seen(record)
-            # ):
-            #     self.strategy.on_skip(record)
-            #     continue
+            if (
+                isinstance(self.strategy, ProductionSheetStrategy)
+                and self.strategy.is_seen(record)
+            ):
+                self.strategy.on_skip(record)
+                continue
 
             output = self._process_record(record)
             if output:
@@ -67,6 +68,8 @@ class MainExecutor:
             industry_classification="N/A",
             ecommerce_platform="N/A",
             lead_status="Unqualified - Website Down",
+            apollo_result=ApolloResult(),
+            seamless_result=SeamlessResult()
         )
 
     def _process_record(self, record: DomainInput) -> Optional[DomainResponse]:
@@ -134,8 +137,15 @@ class MainExecutor:
             merged_summary.redirected_to = redirected_to
 
         if isinstance(self.strategy, ProductionSheetStrategy):
-            merged_summary.apollo_result = self.apollo_results[record.company_url]
-            merged_summary.seamless_result = self.seamless_results[record.company_url]
+            if redirected_to:
+                redirected_to_domain = re.sub(r"http(s)?://(www\.)?", "", website_url)
+                apollo_result = self.apollo_api.enrich_leads([redirected_to_domain])
+                seamless_result = self.seamless_api.enrich_leads([redirected_to_domain])
+                merged_summary.apollo_result = apollo_result[redirected_to_domain]
+                merged_summary.seamless_result = seamless_result[redirected_to_domain]
+            else:
+                merged_summary.apollo_result = self.apollo_results[record.company_url]
+                merged_summary.seamless_result = self.seamless_results[record.company_url]
 
         logger.info(f"Summary extracted against url={website_url}.")
         return merged_summary
