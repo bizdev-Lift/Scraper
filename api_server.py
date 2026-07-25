@@ -4,7 +4,7 @@ import uvicorn
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
-from _types import DomainInput, DomainResponse
+from _types import DomainResponse
 from executor import MainExecutor
 from logger import logger
 
@@ -69,17 +69,9 @@ async def process_company(request: ProcessRequest):
         ProcessResponse: Extracted company information
     """
     try:
-        # Convert request to DomainInput
-        domain_input = DomainInput(
-            row_no="0",
-            company_name=request.domain_url,
-            company_url=request.domain_url,
-        )
-
         logger.info(f"API request received for url: {request.domain_url}")
 
-        # Process the record
-        result = executor.process_single_record(domain_input)
+        result = executor.process_domain(request.domain_url)
 
         logger.info(f"Successfully processed company: {request.domain_url}")
         return result

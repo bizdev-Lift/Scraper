@@ -2,7 +2,7 @@ import os
 import re
 import time
 from dataclasses import asdict, dataclass
-from typing import Any, Optional
+from typing import Optional
 
 import tldextract
 from yarl import URL
@@ -325,8 +325,21 @@ class MainExecutor:
 
         return DomainResponse(**final_summary)
 
-    def process_single_record(self, record: DomainInput) -> Optional[DomainResponse]:
-        return self._process_record(record)
+    def process_domain(
+        self,
+        domain_url: str,
+        apollo_result: Optional[ApolloResult] = None,
+        seamless_result: Optional[SeamlessResult] = None,
+    ) -> Optional[DomainResponse]:
+        """Process a single domain URL without strategy side effects."""
+        record = DomainInput(row_no=0, company_url=domain_url)
+        result = self._process_record(record)
+        if result:
+            if apollo_result:
+                result.apollo_result = apollo_result
+            if seamless_result:
+                result.seamless_result = seamless_result
+        return result
 
     def compute_lead_status(
         self, homepage_summary: DomainResponse, other_summary: Optional[DomainResponse]
@@ -358,10 +371,3 @@ class MainExecutor:
             return "Unqualified - Junk Lead / No Shipping"
 
         return "Lift Prime"
-
-
-def lambda_handler(event: Any, context: Any) -> None:
-    """AWS Lambda handler. Set WORKFLOW_MODE env var to 'production' or 'regular' (default)."""
-    workflow_mode = os.environ.get("WORKFLOW_MODE", "regular")
-    main_executor = MainExecutor(workflow_mode=workflow_mode)
-    main_executor.run()

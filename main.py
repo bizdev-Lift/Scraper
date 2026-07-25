@@ -1,3 +1,3 @@
-from executor import lambda_handler
+from lambdas.splitter import handler as splitter_handler
 
-lambda_handler(None, None)
+splitter_handler({}, None)

@@ -1,23 +1,51 @@
-import re
-import requests
 import base64
-from urllib.parse import urlparse, urljoin
 import mimetypes
+import re
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from urllib.parse import urljoin, urlparse
 
+import requests
 
 IMAGE_EXTENSIONS = (".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp", ".avif")
-PRODUCT_PATH_HINTS = ("/product", "/products", "/shop", "/item", "/items", "/catalog", "/media/catalog", "/uploads", "/cdn/shop")
+PRODUCT_PATH_HINTS = (
+    "/product",
+    "/products",
+    "/shop",
+    "/item",
+    "/items",
+    "/catalog",
+    "/media/catalog",
+    "/uploads",
+    "/cdn/shop",
+)
 # EXCLUDE_HINTS = ("logo", "icon", "sprite", "favicon", "placeholder", "spinner", "loading", "badge", "flag", "payment", "social")
 
 # Generic platform-agnostic hints (for non-Shopify sites)
 # GENERIC_PRODUCT_HINTS = ("/product", "/products", "/shop", "/item", "/items", "/catalog", "/uploads")
 
 EXCLUDE_HINTS = (
-    "logo", "icon", "favicon", "sprite", "placeholder", "spinner", "loading",
-    "badge", "flag", "payment", "social", "facebook", "instagram", "twitter",
-    "footer", "header", "banner", "background", "bg-", "/collections/",
-    "small_logo", "afghanowned",
+    "logo",
+    "icon",
+    "favicon",
+    "sprite",
+    "placeholder",
+    "spinner",
+    "loading",
+    "badge",
+    "flag",
+    "payment",
+    "social",
+    "facebook",
+    "instagram",
+    "twitter",
+    "footer",
+    "header",
+    "banner",
+    "background",
+    "bg-",
+    "/collections/",
+    "small_logo",
+    "afghanowned",
 )
 
 
@@ -71,7 +99,7 @@ def dedupe_image_urls(urls: list[str], max_per_group: int = 1) -> list[str]:
         parsed = urlparse(clean)
         filename = parsed.path.rsplit("/", 1)[-1]  # e.g. EnergydrinkR1-02.jpg
 
-        width_match = re.search(r'width=(\d+)', clean)
+        width_match = re.search(r"width=(\d+)", clean)
         width = int(width_match.group(1)) if width_match else 0
 
         if filename not in by_filename or width > by_filename[filename][1]:
@@ -82,9 +110,9 @@ def dedupe_image_urls(urls: list[str], max_per_group: int = 1) -> list[str]:
     # Step 2: group by "base name" with trailing numbers/angle indicators stripped
     # e.g. EnergydrinkR1-01.jpg, EnergydrinkR1-02.jpg, EnergydrinkR1-03.jpg -> "EnergydrinkR1"
     def base_name(filename: str) -> str:
-        name = re.sub(r'\.\w+$', '', filename)  # strip extension
+        name = re.sub(r"\.\w+$", "", filename)  # strip extension
         # strip trailing -01, -02, _1, _a, etc.
-        name = re.sub(r'[-_]?(\d{1,3}|[a-z])$', '', name, flags=re.IGNORECASE)
+        name = re.sub(r"[-_]?(\d{1,3}|[a-z])$", "", name, flags=re.IGNORECASE)
         return name.lower()
 
     groups = {}
@@ -101,11 +129,16 @@ def dedupe_image_urls(urls: list[str], max_per_group: int = 1) -> list[str]:
     return result
 
 
-
-def download_images(image_urls: list[str], base_url: str, max_images: int = 10, max_size_mb: float = 5.0, max_workers: int = 8) -> list[dict]:
+def download_images(
+    image_urls: list[str],
+    base_url: str,
+    max_images: int = 10,
+    max_size_mb: float = 5.0,
+    max_workers: int = 8,
+) -> list[dict]:
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-                      "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     }
 
     def fetch(src: str) -> dict | None:
@@ -148,6 +181,7 @@ def download_images(image_urls: list[str], base_url: str, max_images: int = 10, 
     images = [results[url] for url in urls_to_fetch if url in results]
     return images
 
+
 def create_image_parts(base_url: str, html: str):
     image_urls = extract_product_image_urls(html)
     downloaded_images = download_images(image_urls, base_url=base_url)
@@ -157,15 +191,15 @@ def create_image_parts(base_url: str, html: str):
         return parts
 
     for image in downloaded_images:
-        urls.append(image['url'])
-        parts.append({
-            "inline_data": {
-                "mime_type": image['mime_type'],
-                "data": image['data'],
+        urls.append(image["url"])
+        parts.append(
+            {
+                "inline_data": {
+                    "mime_type": image["mime_type"],
+                    "data": image["data"],
+                }
             }
-        })
+        )
 
-    parts.append({
-        "text": '\n'.join(urls)
-    })
+    parts.append({"text": "\n".join(urls)})
     return parts
