@@ -39,9 +39,6 @@ SHEET_NAME=<sheet_name>
 GOOD_RESULTS_SHEET="Scraper GOOD RESULTS ready to import"
 SKIP_RESULTS_SHEET="Scraper SKIP exist known lead"
 ERROR_RESULTS_SHEET="Scraper ERROR For Manual Scrapping"
-HISTORY_GOOD_RESULTS_SHEET="HISTORY Scraper GOOD RESULTS imported history"
-HISTORY_SKIP_RESULTS_SHEET="HISTORY Skip exist history"
-HISTORY_ERROR_RESULTS_SHEET="HISTORY error manual scrape"
 ```
 
 There is another optional env called `MAX_INPUT_RECORDS` that you can set to tell the script how many domains should it parse in each execution.

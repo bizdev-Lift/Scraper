@@ -76,7 +76,7 @@ class LLMHelper:
 
         if "reasoning" in output_json:
             reasoning = output_json.pop("reasoning")
-            print(reasoning)
+            logger.info(reasoning)
 
         if "links" in output_json:
             links = output_json.pop("links")
@@ -84,6 +84,10 @@ class LLMHelper:
             links = []
             logger.warning(f"Unable to extract links from the response for url={url}.")
 
+        for key,value in output_json.items():
+            if isinstance(value, list):
+                output_json[key] = ','.join(value)
+            
         prompt_tokens = chat_completion.prompt_tokens()
         completion_tokens = chat_completion.completion_tokens()
         cost = chat_completion.cost(prompt_tokens, completion_tokens)

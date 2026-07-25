@@ -48,10 +48,12 @@ class MainExecutor:
             ):
                 self.strategy.on_skip(record)
                 continue
-
-            output = self._process_record(record)
-            if output:
-                self.strategy.on_success(record, output)
+            try:
+                output = self._process_record(record)
+                if output:
+                    self.strategy.on_success(record, output)
+            except:
+                logger.exception(f"Error while parsing domain {record.company_url}. Please visit it again.")
 
             time.sleep(10)
 

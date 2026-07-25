@@ -1,4 +1,4 @@
 import logging
 
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("llmdataextraction")
+logger.setLevel(logging.INFO)

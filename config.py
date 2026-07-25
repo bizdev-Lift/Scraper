@@ -22,9 +22,6 @@ class Settings:
         good_results_sheet=os.environ.get("GOOD_RESULTS_SHEET"),
         skip_results_sheet=os.environ.get("SKIP_RESULTS_SHEET"),
         error_results_sheet=os.environ.get("ERROR_RESULTS_SHEET"),
-        history_good_results_sheet=os.environ.get("HISTORY_GOOD_RESULTS_SHEET"),
-        history_skip_results_sheet=os.environ.get("HISTORY_SKIP_RESULTS_SHEET"),
-        history_error_results_sheet=os.environ.get("HISTORY_ERROR_RESULTS_SHEET"),
 
     )
     proxy = None
