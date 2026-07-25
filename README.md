@@ -17,7 +17,7 @@ A tool for extracting structured data from websites using Large Language Models 
 Create a `.env` file in the project root with the following variables:
 
 ```bash
-CREDENTIALS_PATH=path_to_your_credentials.json 
+CREDENTIALS_PATH=path_to_your_credentials.json
 GEMINI_API_KEY=your_gemini_api_key
 AWS_BUCKET_NAME="domain-html-storage-bucket"
 CREDENTIALS_PATH=credentials.json
@@ -100,7 +100,7 @@ This application performs automated data insights for each domain using generic 
    ```
 
    For example, if my repository url is `383488877661.dkr.ecr.us-east-1.amazonaws.com/llm-data-extractor:latest`, then the commands will be.
-   ```bash 
+   ```bash
    docker tag llm-data-extractor:latest 383488877661.dkr.ecr.us-east-1.amazonaws.com/llm-data-extractor:latest
    docker push 383488877661.dkr.ecr.us-east-1.amazonaws.com/llm-data-extractor:latest
    ```
@@ -135,4 +135,3 @@ The format of the sheet would be like this.
 |Bailey Blossom|baileysblossoms.com|---|---|---|---|---|---|---|---|---|---|
 |Protect Products | protectoproducts.com|---|---|---|---|---|---|---|---|---|---|
 |Beelart Embroidery | beelartembroidery.com|---|---|---|---|---|---|---|---|---|---|
-

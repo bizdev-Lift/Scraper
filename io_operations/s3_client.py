@@ -1,7 +1,8 @@
+import logging
+import os
+
 import boto3
 from botocore.exceptions import NoCredentialsError
-import os
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -43,15 +44,11 @@ class S3Client:
             bool: True if the upload is successful, False otherwise.
         """
         try:
-            self.s3.put_object(
-                Bucket=self.bucket_name, Key=key, Body=content.encode("utf-8")
-            )
+            self.s3.put_object(Bucket=self.bucket_name, Key=key, Body=content.encode("utf-8"))
             logger.info(f"Successfully wrote content to s3://{self.bucket_name}/{key}")
             return True
         except NoCredentialsError:
-            logger.error(
-                "AWS credentials not found. Please configure your credentials."
-            )
+            logger.error("AWS credentials not found. Please configure your credentials.")
             return False
         except Exception as e:
             logger.error(f"Failed to write to S3: {e}")
@@ -73,9 +70,7 @@ class S3Client:
             logger.info(f"Successfully read content from s3://{self.bucket_name}/{key}")
             return content
         except NoCredentialsError:
-            logger.error(
-                "AWS credentials not found. Please configure your credentials."
-            )
+            logger.error("AWS credentials not found. Please configure your credentials.")
             return None
         except self.s3.exceptions.NoSuchKey:
             logger.warning(f"File not found at s3://{self.bucket_name}/{key}")

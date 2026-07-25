@@ -8,7 +8,7 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-from scraper.block_detector import ScrapeBlockDetector
+from scraper.block_detector import ScrapeBlockDetector  # noqa: E402
 
 # Test case: Page with "too many requests" in normal content
 normal_page_html = """

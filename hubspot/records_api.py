@@ -1,7 +1,7 @@
-import os
-import requests
 from typing import Optional
-from logger import logger
+
+import requests
+
 BASE_URL = "https://api.hubapi.com"
 
 HUBSPOT_BATCH_LIMIT = 100
@@ -15,7 +15,7 @@ class HubSpotCompaniesClient:
         }
 
     def _post(self, path: str, body: dict, mode="get") -> dict:
-        resp = requests.post(BASE_URL + path, headers=self.headers, json=body)                
+        resp = requests.post(BASE_URL + path, headers=self.headers, json=body)
         resp.raise_for_status()
         return resp.json()
 
@@ -32,19 +32,12 @@ class HubSpotCompaniesClient:
         # Process in chunks of 5 (HubSpot max filterGroups per request)
         # for i in range(0, len(domains), 20):
         # chunk = domains[i:i + 5]
- 
+
         body = {
             "filterGroups": [
-                {
-                    "filters": [{
-                        "propertyName": "name",
-                        "operator": "IN",
-                        "values": domains
-                    }]
-                }
+                {"filters": [{"propertyName": "name", "operator": "IN", "values": domains}]}
             ],
             "properties": ["name"],
-            
             "limit": 100,
         }
 
@@ -60,7 +53,8 @@ class HubSpotCompaniesClient:
         """
         Create or update a single company in HubSpot, keyed by domain.
 
-        record: e.g. {"domain": "example.com", "properties": {"name": "Example Inc", "industry": "SAAS"}}
+        record: e.g.
+            ``{"domain": "example.com", "properties": {"name": "Example Inc", "industry": "SAAS"}}``
 
         Thin wrapper around add_companies() for the single-record case.
         Returns:
@@ -74,40 +68,41 @@ class HubSpotCompaniesClient:
 
         results = combined["results"]
         return {"success": True, "result": results[0] if results else None}
-    
+
     def add_companies(self, records: list[dict]) -> dict:
         """
         Create or update companies in HubSpot, keyed by domain.
- 
+
         records: list of dicts, e.g.
-            [{"domain": "example.com", "properties": {"name": "Example Inc", "industry": "SAAS"}}, ...]
- 
+            [{"domain": "example.com", "properties": {"name": "Example Inc",
+             "industry": "SAAS"}}, ...]
+
         Uses HubSpot's batch upsert endpoint (idProperty="domain"), so a company
         is created if that domain doesn't exist yet, or updated if it does -
         no need to look up object IDs first.
- 
+
         Batches into groups of 100 (HubSpot's per-request batch limit).
         Returns a dict with combined "results" and any "errors" encountered.
         """
         combined = {"results": [], "errors": []}
- 
+
         if not records:
             return combined
- 
+
         for i in range(0, len(records), HUBSPOT_BATCH_LIMIT):
-            chunk = records[i:i + HUBSPOT_BATCH_LIMIT]
- 
+            chunk = records[i : i + HUBSPOT_BATCH_LIMIT]
+
             inputs = [
                 {
                     # "idProperty": "domain",
                     # "id": record["domain"],
-                    "properties": record['properties'],
+                    "properties": record["properties"],
                 }
                 for record in chunk
             ]
- 
+
             body = {"inputs": inputs}
- 
+
             try:
                 # data = self._post("/crm/v3/objects/companies/batch/upsert", body)
                 data = self._post("/crm/v3/objects/companies/batch/create", body, mode="post")
@@ -116,10 +111,12 @@ class HubSpotCompaniesClient:
             except requests.HTTPError as e:
                 # Capture the failed chunk instead of aborting the whole run -
                 # lets you retry just the failed domains later.
-                combined["errors"].append({
-                    "chunk_domains": [r["domain"] for r in chunk],
-                    "status_code": e.response.status_code if e.response is not None else None,
-                    "detail": e.response.text if e.response is not None else str(e),
-                })
- 
+                combined["errors"].append(
+                    {
+                        "chunk_domains": [r["domain"] for r in chunk],
+                        "status_code": e.response.status_code if e.response is not None else None,
+                        "detail": e.response.text if e.response is not None else str(e),
+                    }
+                )
+
         return combined

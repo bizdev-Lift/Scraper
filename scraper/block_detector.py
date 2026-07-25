@@ -1,6 +1,6 @@
 import re
-from typing import List, Dict, Set
 from dataclasses import dataclass
+from typing import Dict, List
 
 
 @dataclass
@@ -68,9 +68,7 @@ class ScrapeBlockDetector:
             "attention required! | cloudflare",
         ]
 
-    def is_blocked(
-        self, html_content: str, url: str = "", status_code: int = 200
-    ) -> Dict:
+    def is_blocked(self, html_content: str, url: str = "", status_code: int = 200) -> Dict:
         if not html_content or len(html_content.strip()) < 50:
             return {"blocked": True, "reason": "empty_response", "confidence": 0.9}
 
@@ -132,9 +130,7 @@ class ScrapeBlockDetector:
         # Check title indicators (already have title_or_h1_text from above)
         if title_or_h1_text:
             title_signals = [
-                indicator
-                for indicator in self.title_indicators
-                if indicator in title_or_h1_text
+                indicator for indicator in self.title_indicators if indicator in title_or_h1_text
             ]
             if title_signals:
                 blocking_signals.extend(
@@ -169,9 +165,7 @@ class ScrapeBlockDetector:
             "confidence": min(confidence_score, 1.0),
         }
 
-    def _count_pattern_matches(
-        self, html_content: str, pattern: BlockingPattern
-    ) -> int:
+    def _count_pattern_matches(self, html_content: str, pattern: BlockingPattern) -> int:
         matches = 0
         content = html_content if pattern.case_sensitive else html_content.lower()
 
@@ -207,7 +201,8 @@ class ScrapeBlockDetector:
             (r"window\.ddjskey", 2),
             # Generic bot challenge pages (very minimal content)
             (
-                r"<body[^>]*>\s*<(?:div|main)[^>]*>\s*<(?:h1|h2)[^>]*>(?:just a moment|checking|verifying|please wait)",
+                r"<body[^>]*>\s*<(?:div|main)[^>]*>\s*<(?:h1|h2)[^>]*>"
+                r"(?:just a moment|checking|verifying|please wait)",
                 2,
             ),
         ]
@@ -274,9 +269,7 @@ class ScrapeBlockDetector:
         text_content = text_content.strip()
 
         # If page has very little text content and no normal page structure, increase score
-        if len(text_content) < 300 and not (
-            has_navigation or has_footer or has_main_content
-        ):
+        if len(text_content) < 300 and not (has_navigation or has_footer or has_main_content):
             score += 1
 
         # Require a score of at least 2 to indicate blocking
