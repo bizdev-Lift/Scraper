@@ -44,15 +44,15 @@ class MainExecutor:
         self.bot_scraper = BotScraper(s3_bucket_name=bucket_name)
         self.apollo_api = ApolloAPI()
         self.seamless_api = SeamlessAPI()
-        self.apollo_results: dict[str, ApolloResult] = {}
-        self.seamless_results: dict[str, SeamlessResult] = {}
 
     def run(self) -> None:
         records = self.strategy.get_records()
+        apollo_results = {}
+        seamless_results = {}
         if self.strategy.pre_enrich:
             domains = [record.company_url for record in records]
-            self.apollo_results = self.apollo_api.enrich_leads(domains)
-            self.seamless_results = self.seamless_api.enrich_leads(domains)
+            apollo_results = self.apollo_api.enrich_leads(domains)
+            seamless_results = self.seamless_api.enrich_leads(domains)
         for record in records:
             if self.strategy.check_seen and self.strategy.is_seen(record):
                 self.strategy.on_skip(record)
@@ -60,6 +60,13 @@ class MainExecutor:
             try:
                 output = self._process_record(record)
                 if output:
+                    if self.strategy.pre_enrich:
+                        output.apollo_result = apollo_results.get(
+                            record.company_url, ApolloResult()
+                        )
+                        output.seamless_result = seamless_results.get(
+                            record.company_url, SeamlessResult()
+                        )
                     self.strategy.on_success(record, output)
             except Exception:
                 logger.exception(
@@ -150,17 +157,6 @@ class MainExecutor:
 
         if redirected_to:
             merged_summary.redirected_to = redirected_to
-
-        if self.strategy.pre_enrich:
-            if redirected_to:
-                redirected_to_domain = re.sub(r"http(s)?://(www\.)?", "", website_url)
-                apollo_result = self.apollo_api.enrich_leads([redirected_to_domain])
-                seamless_result = self.seamless_api.enrich_leads([redirected_to_domain])
-                merged_summary.apollo_result = apollo_result[redirected_to_domain]
-                merged_summary.seamless_result = seamless_result[redirected_to_domain]
-            else:
-                merged_summary.apollo_result = self.apollo_results[record.company_url]
-                merged_summary.seamless_result = self.seamless_results[record.company_url]
 
         logger.info(f"Summary extracted against url={website_url}.")
         return merged_summary
@@ -334,10 +330,18 @@ class MainExecutor:
         """Process a single domain URL without strategy side effects."""
         record = DomainInput(row_no=0, company_url=domain_url)
         result = self._process_record(record)
-        if result:
-            if apollo_result:
+        if not result:
+            return result
+
+        if self.strategy.pre_enrich:
+            if result.redirected_to:
+                redirected_to_domain = re.sub(r"http(s)?://(www\.)?", "", result.redirected_to)
+                apollo_result = self.apollo_api.enrich_leads([redirected_to_domain])
+                seamless_result = self.seamless_api.enrich_leads([redirected_to_domain])
+                result.apollo_result = apollo_result.get(redirected_to_domain, ApolloResult())
+                result.seamless_result = seamless_result.get(redirected_to_domain, SeamlessResult())
+            else:
                 result.apollo_result = apollo_result
-            if seamless_result:
                 result.seamless_result = seamless_result
         return result
 

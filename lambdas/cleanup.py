@@ -1,7 +1,8 @@
 from typing import Any
 
+from _types import DomainInput
 from config import settings
-from io_operations.google_sheets import GoogleSheetsHandler
+from io_operations.google_sheets import GoogleSheetsHandler, ProductionSheetStrategy
 from logger import logger
 
 
@@ -25,15 +26,11 @@ def handler(event: dict, context: Any) -> dict:
         return {"deleted": 0}
 
     handler_ = GoogleSheetsHandler(settings.spreadsheet_info)
-    sheet = handler_.open_sheet(settings.spreadsheet_info.sheet_name)
+    strategy = ProductionSheetStrategy(handler_)
+    records = [
+        DomainInput(row_no=item["row_no"], company_url=item["domain"]) for item in all_processed
+    ]
+    strategy.on_complete(records)
 
-    row_numbers = sorted(set(item["row_no"] for item in all_processed), reverse=True)
-    for row_no in row_numbers:
-        try:
-            sheet.delete_rows(row_no)
-            logger.info(f"Deleted row {row_no} from input sheet")
-        except Exception as e:
-            logger.error(f"Failed to delete row {row_no}: {e}")
-
-    logger.info(f"Cleanup complete: {len(row_numbers)} rows deleted")
-    return {"deleted": len(row_numbers)}
+    logger.info(f"Cleanup complete: {len(records)} rows deleted")
+    return {"deleted": len(records)}
