@@ -35,16 +35,20 @@ class GoogleSheetsHandler:
     def _authenticate(self) -> gspread.Client:
         if not self.spreadsheet_info.credentials_path:
             raise GoogleSheetsError("Credentials path not provided.")
-
-        try:
-            creds = ServiceAccountCredentials.from_json_keyfile_name(
-                self.spreadsheet_info.credentials_path, settings.google_authorization_scope
-            )
-            client = gspread.authorize(creds)
-            return client
-        except Exception as e:
-            logger.error(f"Failed to authorize service account: {e}")
-            raise GoogleSheetsError("Service account authorization failed.") from e
+        count = 3
+        while count > 0:
+            try:
+                creds = ServiceAccountCredentials.from_json_keyfile_name(
+                    self.spreadsheet_info.credentials_path, settings.google_authorization_scope
+                )
+                client = gspread.authorize(creds)
+                return client
+            except Exception as e:
+                logger.error(f"Failed to authorize service account: {e}")
+                time.sleep(5)
+                count -= 1
+                if count == 0:
+                    raise GoogleSheetsError("Service account authorization failed.") from e
 
     def open_sheet(self, sheet_name: str, sheet_id: Optional[str] = None) -> gspread.Worksheet:
         try:
