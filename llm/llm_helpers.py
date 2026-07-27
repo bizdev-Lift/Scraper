@@ -11,7 +11,8 @@ from _types import DomainResponse
 from config import settings
 from io_operations.google_sheets import GoogleSheetsHandler
 from llm._types import GeminiChatCompletion, GeminiResponse
-from llm.image_parsing import create_image_parts
+
+# from llm.image_parsing import create_image_parts
 from llm.utils import clean_llm_response_json_data
 
 logger = logging.getLogger(__name__)
@@ -142,18 +143,22 @@ class LLMHelper:
         thinking_level: str = "MINIMAL",
         temperature: float = 1.0,
     ) -> dict:
-        image_parts = (
-            create_image_parts(company_url, input_html)
-            if page_name == "Homepage" and company_url
-            else []
-        )
-        prompt = self.read_prompt(prompt_name).replace("{{CONTENT}}", input_html)
-        if company_url:
-            prompt = prompt.replace("{{SITE_URL}}", company_url)
+        # image_parts = (
+        #     create_image_parts(company_url, input_html)
+        #     if page_name == "Homepage" and company_url
+        #     else []
+        # )
+        # prompt = self.read_prompt(prompt_name).replace("{{CONTENT}}", input_html)
+        # if company_url:
+        #     prompt = prompt.replace("{{SITE_URL}}", company_url)
 
-        response = self.make_gemini_request(prompt, image_parts, thinking_level, temperature)
-        logger.info(f"Gemini response status: {response.status_code}")
-        return response.json()
+        # response = self.make_gemini_request(prompt, image_parts, thinking_level, temperature)
+        # logger.info(f"Gemini response status: {response.status_code}")
+        # return response.json()
+        with open("response.json") as f:
+            data = f.read()
+        f.close()
+        return json.loads(data)
 
     def read_prompt(self, prompt_name: str) -> str:
         prompt_path = os.path.join(self.PROMPT_DIRECTORY, prompt_name)
