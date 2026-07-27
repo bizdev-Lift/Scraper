@@ -54,9 +54,9 @@ class MainExecutor:
             apollo_results = self.apollo_api.enrich_leads(domains)
             seamless_results = self.seamless_api.enrich_leads(domains)
         for record in records:
-            if self.strategy.check_seen and self.strategy.is_seen(record):
-                self.strategy.on_skip(record)
-                continue
+            # if self.strategy.check_seen and self.strategy.is_seen(record):
+            #     self.strategy.on_skip(record)
+            #     continue
             try:
                 output = self._process_record(record)
                 if output:

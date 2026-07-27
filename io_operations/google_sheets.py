@@ -2,12 +2,15 @@ import copy
 import datetime
 import logging
 import re
+import time
 from abc import ABC, abstractmethod
 from dataclasses import asdict
 from typing import Any, Literal, Optional
 
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
+from requests.adapters import HTTPAdapter
+from urllib3.util import Retry
 
 from _types import DomainInput, DomainResponse, GoogleSheetInfo
 from config import settings
@@ -39,7 +42,19 @@ class GoogleSheetsHandler:
             creds = ServiceAccountCredentials.from_json_keyfile_name(
                 self.spreadsheet_info.credentials_path, settings.google_authorization_scope
             )
-            return gspread.authorize(creds)
+            client = gspread.authorize(creds)
+
+            retry_strategy = Retry(
+                total=5,
+                backoff_factor=2,
+                status_forcelist=[429],
+                allowed_methods=["GET", "POST", "PUT", "DELETE", "PATCH"],
+                raise_on_status=False,
+            )
+            adapter = HTTPAdapter(max_retries=retry_strategy)
+            client.session.mount("https://", adapter)
+
+            return client
         except Exception as e:
             logger.error(f"Failed to authorize service account: {e}")
             raise GoogleSheetsError("Service account authorization failed.") from e
@@ -195,6 +210,7 @@ class RegularSheetStrategy(BaseSheetStrategy):
             )
         else:
             self.sheet.update([row], f"C{domain_input.row_no}")
+        time.sleep(0.5)
 
 
 class ProductionSheetStrategy(BaseSheetStrategy):
@@ -207,7 +223,6 @@ class ProductionSheetStrategy(BaseSheetStrategy):
         self.good_sheet = handler.open_sheet(info.good_results_sheet)
         self.skip_sheet = handler.open_sheet(info.skip_results_sheet)
         self.error_sheet = handler.open_sheet(info.error_results_sheet)
-        self.history_domains = self._load_history_domains()
         self.hubspot_client = HubSpotCompaniesClient(settings.hubspot_api_key)
 
     @property
@@ -231,10 +246,22 @@ class ProductionSheetStrategy(BaseSheetStrategy):
                 records_to_check.append(record[0])
             count -= 1
 
-        self.history_domains = self.history_domains.union(
+        history_domains = self._load_history_domains()
+        history_domains = history_domains.union(
             self.hubspot_client.get_existing_domains(records_to_check)
         )
-        return records
+
+        unseen = []
+        for r in records:
+            if r.company_url.lower() not in history_domains:
+                unseen.append(r)
+        logger.info(
+            "Filtered %d records: %d unseen, %d already in history",
+            len(records),
+            len(unseen),
+            len(records) - len(unseen),
+        )
+        return unseen
 
     def is_seen(self, record: DomainInput) -> bool:
         return record.company_url.lower() in self.history_domains
@@ -253,6 +280,7 @@ class ProductionSheetStrategy(BaseSheetStrategy):
         logger.info(f"Total rows to delete: {len(row_numbers)}")
         for row_no in row_numbers:
             self.input_sheet.delete_rows(row_no)
+            time.sleep(0.5)
 
     def _append(
         self,
@@ -308,6 +336,7 @@ class ProductionSheetStrategy(BaseSheetStrategy):
             sheet.append_row([domain_input.company_url, scrape_date_str], table_range="A1")
         else:
             logger.error(f"Invalid scrape status or missing output for {domain_input.company_url}")
+        time.sleep(0.5)
 
     def _load_history_domains(self) -> set[str]:
         info = self.handler.spreadsheet_info
