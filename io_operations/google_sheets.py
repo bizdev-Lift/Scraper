@@ -1,6 +1,7 @@
 import copy
 import datetime
 import logging
+import random
 import re
 import time
 from abc import ABC, abstractmethod
@@ -54,7 +55,7 @@ class GoogleSheetsHandler:
             except Exception as e:
                 logger.error(f"Unable to load sheet '{sheet_name}': {e}")
                 logger.error("waiting for 5 seconds")
-                time.sleep(5)
+                time.sleep(random.randint(0, 10))
                 logger.error("Trying now")
                 count -= 1
                 if count == 0:
