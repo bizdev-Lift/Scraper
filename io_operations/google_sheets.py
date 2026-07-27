@@ -9,8 +9,6 @@ from typing import Any, Literal, Optional
 
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
-from requests.adapters import HTTPAdapter
-from urllib3.util import Retry
 
 from _types import DomainInput, DomainResponse, GoogleSheetInfo
 from config import settings
@@ -43,17 +41,6 @@ class GoogleSheetsHandler:
                 self.spreadsheet_info.credentials_path, settings.google_authorization_scope
             )
             client = gspread.authorize(creds)
-
-            retry_strategy = Retry(
-                total=5,
-                backoff_factor=2,
-                status_forcelist=[429],
-                allowed_methods=["GET", "POST", "PUT", "DELETE", "PATCH"],
-                raise_on_status=False,
-            )
-            adapter = HTTPAdapter(max_retries=retry_strategy)
-            client.session.mount("https://", adapter)
-
             return client
         except Exception as e:
             logger.error(f"Failed to authorize service account: {e}")
