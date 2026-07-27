@@ -35,28 +35,28 @@ class GoogleSheetsHandler:
     def _authenticate(self) -> gspread.Client:
         if not self.spreadsheet_info.credentials_path:
             raise GoogleSheetsError("Credentials path not provided.")
+        try:
+            creds = ServiceAccountCredentials.from_json_keyfile_name(
+                self.spreadsheet_info.credentials_path, settings.google_authorization_scope
+            )
+            client = gspread.authorize(creds)
+            return client
+        except Exception as e:
+            logger.error(f"Failed to authorize service account: {e}")
+            raise GoogleSheetsError("Service account authorization failed.") from e
+
+    def open_sheet(self, sheet_name: str, sheet_id: Optional[str] = None) -> gspread.Worksheet:
         count = 3
         while count > 0:
             try:
-                creds = ServiceAccountCredentials.from_json_keyfile_name(
-                    self.spreadsheet_info.credentials_path, settings.google_authorization_scope
-                )
-                client = gspread.authorize(creds)
-                return client
+                spreadsheet_id = sheet_id or self.spreadsheet_info.spreadsheet_id
+                return self.client.open_by_key(spreadsheet_id).worksheet(sheet_name)
             except Exception as e:
-                logger.error(f"Failed to authorize service account: {e}")
+                logger.error(f"Unable to load sheet '{sheet_name}': {e}")
                 time.sleep(5)
                 count -= 1
                 if count == 0:
-                    raise GoogleSheetsError("Service account authorization failed.") from e
-
-    def open_sheet(self, sheet_name: str, sheet_id: Optional[str] = None) -> gspread.Worksheet:
-        try:
-            spreadsheet_id = sheet_id or self.spreadsheet_info.spreadsheet_id
-            return self.client.open_by_key(spreadsheet_id).worksheet(sheet_name)
-        except Exception as e:
-            logger.error(f"Unable to load sheet '{sheet_name}': {e}")
-            raise GoogleSheetsError(f"Failed to load sheet: {sheet_name}") from e
+                    raise GoogleSheetsError(f"Failed to load sheet: {sheet_name}") from e
 
     @staticmethod
     def is_domain(input_string: str) -> bool:
