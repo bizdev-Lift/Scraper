@@ -53,9 +53,9 @@ class GoogleSheetsHandler:
                 return self.client.open_by_key(spreadsheet_id).worksheet(sheet_name)
             except Exception as e:
                 logger.error(f"Unable to load sheet '{sheet_name}': {e}")
-                logger.info("waiting for 5 seconds")
+                logger.error("waiting for 5 seconds")
                 time.sleep(5)
-                logger.info("Trying now")
+                logger.error("Trying now")
                 count -= 1
                 if count == 0:
                     raise GoogleSheetsError(f"Failed to load sheet: {sheet_name}") from e
