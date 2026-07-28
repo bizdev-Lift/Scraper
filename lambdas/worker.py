@@ -24,7 +24,6 @@ def handler(event: dict, context: Any) -> dict:
     executor = MainExecutor(workflow_mode=workflow_mode)
     processed = []
     failed = []
-    skipped = []
 
     domain_urls = [item["domain"] for item in domains]
     apollo_results = {}
@@ -60,15 +59,6 @@ def handler(event: dict, context: Any) -> dict:
                     }
                 )
                 logger.info(f"Successfully processed domain={record.company_url}")
-            elif mode == "error":
-                skipped.append(
-                    {
-                        "domain": record.company_url,
-                        "row_no": record.row_no,
-                        "data": asdict(result),
-                        "error": "Skipping this record as it may already exist!",
-                    }
-                )
             else:
                 failed.append(
                     {
@@ -90,9 +80,7 @@ def handler(event: dict, context: Any) -> dict:
             logger.exception(f"Error processing domain={record.company_url}")
 
     s3_key = f"staging/{job_id}/{chunk_id}.json"
-    s3.write_raw_content(
-        s3_key, json.dumps({"processed": processed, "failed": failed, "skipped": skipped})
-    )
+    s3.write_raw_content(s3_key, json.dumps({"processed": processed, "failed": failed}))
 
     logger.info(
         f"Chunk {chunk_id} complete: {len(processed)} processed, "

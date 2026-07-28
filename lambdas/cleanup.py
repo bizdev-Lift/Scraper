@@ -31,7 +31,6 @@ def handler(event: dict, context: Any) -> dict:
 
     all_processed = []
     all_failed = []
-    all_skipped = []
     for key in keys:
         try:
             content = s3.read_content(key)
@@ -40,11 +39,10 @@ def handler(event: dict, context: Any) -> dict:
             data = json.loads(content)
             all_processed.extend(data.get("processed", []))
             all_failed.extend(data.get("failed", []))
-            all_skipped.extend(data.get("skipped", []))
         except Exception as e:
             logger.error(f"Failed to parse s3://{s3.bucket_name}/{key}: {e}")
 
-    if not all_processed and not all_failed and not all_skipped:
+    if not all_processed and not all_failed:
         logger.info("No results to save")
         return {"saved": 0, "deleted": 0}
 
@@ -55,10 +53,7 @@ def handler(event: dict, context: Any) -> dict:
         else RegularSheetStrategy(handler_)
     )
 
-    # Merge skipped items into failed so save_results writes them to skip sheet
-    all_failed.extend(all_skipped)
-
-    strategy.save_results(all_processed, all_failed, all_skipped)
+    strategy.save_results(all_processed, all_failed)
 
     saved_count = 0
 
@@ -79,7 +74,5 @@ def handler(event: dict, context: Any) -> dict:
         else:
             logger.info(f"No staging files found for job {job_id}")
 
-    logger.info(
-        f"Job {job_id}: {saved_count} saved, {len(all_failed)} failed, {len(all_skipped)} skipped"
-    )
+    logger.info(f"Job {job_id}: {saved_count} saved, {len(all_failed)} failed")
     return {"saved": saved_count, "deleted": saved_count}

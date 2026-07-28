@@ -282,9 +282,14 @@ class ProductionSheetStrategy(BaseSheetStrategy):
         )
 
         unseen = []
+        seen = []
         for r in records:
             if r.company_url.lower() not in history_domains:
                 unseen.append(r)
+            else:
+                seen.append(r)
+
+        self.save_skipped_results(seen)
         logger.info(
             "Filtered %d records: %d unseen, %d already in history",
             len(records),
@@ -305,15 +310,15 @@ class ProductionSheetStrategy(BaseSheetStrategy):
     def on_error(self, record: DomainInput, output: DomainResponse) -> None:
         self._append(self.error_sheet, record, output, status="error")
 
-    def save_results(self, processed: list[dict], failed: list[dict], skipped: list[dict]) -> None:
+    def save_results(self, processed: list[dict], failed: list[dict]) -> None:
         scrape_date_str = datetime.datetime.now().strftime("%m-%d-%Y")
 
         # 1. HubSpot (Successes only)
-        hubspot_payloads = [p["hubspot_payload"] for p in processed if p.get("hubspot_payload")]
-        if hubspot_payloads:
-            combined = self.hubspot_client.add_companies(hubspot_payloads)
-            for err in combined.get("errors", []):
-                logger.error(f"HubSpot batch error: {err}")
+        # hubspot_payloads = [p["hubspot_payload"] for p in processed if p.get("hubspot_payload")]
+        # if hubspot_payloads:
+        #     combined = self.hubspot_client.add_companies(hubspot_payloads)
+        #     for err in combined.get("errors", []):
+        #         logger.error(f"HubSpot batch error: {err}")
 
         # 2. Good Sheet (Successes)
         if processed:
@@ -330,9 +335,10 @@ class ProductionSheetStrategy(BaseSheetStrategy):
             self.error_sheet.append_rows(rows, value_input_option="USER_ENTERED")
             time.sleep(0.5)
 
-        # 4. Skip Sheet (Skips/Failed)
+    def save_skipped_results(self, skipped: list[str]):
+        scrape_date_str = datetime.datetime.now().strftime("%m-%d-%Y")
         if skipped:
-            rows = [[p["domain"], scrape_date_str] for p in skipped]
+            rows = [[d, scrape_date_str] for d in skipped]
             self.skip_sheet.append_rows(rows, value_input_option="USER_ENTERED")
             time.sleep(0.5)
 

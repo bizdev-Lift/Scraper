@@ -109,14 +109,14 @@ class MainExecutor:
 
         if not result.body:
             logger.error(f"Unable to scrape url={record.company_url}. Returning default summary.")
-            self.strategy.on_error(record, default_summary)
+            # self.strategy.on_error(record, default_summary)
             return "error", default_summary
 
         if result.is_blocked:
             logger.error(f"url={record.company_url} has been blocked. Returning default summary.")
             default_summary.lead_status = "Unqualified - Website Blocked"
-            self.strategy.on_error(record, default_summary)
-            return "skip", default_summary
+            # self.strategy.on_error(record, default_summary)
+            return "error", default_summary
             # return None
 
         website_url = self._determine_website_url(record.company_url, result.domain_url)
