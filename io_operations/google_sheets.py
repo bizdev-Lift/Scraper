@@ -327,20 +327,20 @@ class ProductionSheetStrategy(BaseSheetStrategy):
                 self._build_success_row(p["domain"], p.get("data", {}), scrape_date_str)
                 for p in processed
             ]
-            self.good_sheet.append_rows(rows, value_input_option="USER_ENTERED")
+            self.good_sheet.append_rows(rows, value_input_option="USER_ENTERED", table_range="A1")
             time.sleep(0.5)
 
         # 3. Error Sheet (Errors)
         if failed:
             rows = [[p["domain"], p.get("error", "Unknown Error"), scrape_date_str] for p in failed]
-            self.error_sheet.append_rows(rows, value_input_option="USER_ENTERED")
+            self.error_sheet.append_rows(rows, value_input_option="USER_ENTERED", table_range="A1")
             time.sleep(0.5)
 
     def save_skipped_results(self, skipped: list[DomainInput]):
         scrape_date_str = datetime.datetime.now().strftime("%m-%d-%Y")
         if skipped:
             rows = [[r.company_url, scrape_date_str] for r in skipped]
-            self.skip_sheet.append_rows(rows, value_input_option="USER_ENTERED")
+            self.skip_sheet.append_rows(rows, value_input_option="USER_ENTERED", table_range="A1")
             time.sleep(0.5)
 
     def _build_success_row(self, domain: str, data: dict, scrape_date: str) -> list:
