@@ -290,6 +290,7 @@ class ProductionSheetStrategy(BaseSheetStrategy):
                 seen.append(r)
 
         self.save_skipped_results(seen)
+        self.on_complete(seen)
         logger.info(
             "Filtered %d records: %d unseen, %d already in history",
             len(records),
@@ -335,10 +336,10 @@ class ProductionSheetStrategy(BaseSheetStrategy):
             self.error_sheet.append_rows(rows, value_input_option="USER_ENTERED")
             time.sleep(0.5)
 
-    def save_skipped_results(self, skipped: list[str]):
+    def save_skipped_results(self, skipped: list[DomainInput]):
         scrape_date_str = datetime.datetime.now().strftime("%m-%d-%Y")
         if skipped:
-            rows = [[d, scrape_date_str] for d in skipped]
+            rows = [[r.company_url, scrape_date_str] for r in skipped]
             self.skip_sheet.append_rows(rows, value_input_option="USER_ENTERED")
             time.sleep(0.5)
 
