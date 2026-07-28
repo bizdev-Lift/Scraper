@@ -617,7 +617,7 @@ Read your reasoning for b2b_sales. Find the LAST sentence that states a conclusi
 Confirm verbatim surrounding text actually contains the stated trigger/keyword as a substring. If not → answer is "No".
 
 **Step 5 — lead_status consistency check:**
-If `lead_status` is "Unqualified – Junk Lead / No Shipping" but top-level `b2c_sales` is "Yes" OR top-level `b2b_sales` is "Yes" → this is a contradiction. You MUST change `lead_status` to "Lift Prime" (assuming website is active and US-based). A Junk Lead can only be assigned when BOTH b2c_sales AND b2b_sales are "No".
+If `lead_status` is "Unqualified - Junk Lead / No Shipping" but top-level `b2c_sales` is "Yes" OR top-level `b2b_sales` is "Yes" → this is a contradiction. You MUST change `lead_status` to "Lift Prime" (assuming website is active and US-based). A Junk Lead can only be assigned when BOTH b2c_sales AND b2b_sales are "No".
 
 **Step 6 — New fields consistency check:**
 - shipping_messaging must be an array, never a single string (except ["Not Mentioned"])

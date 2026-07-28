@@ -371,6 +371,6 @@ class MainExecutor:
             other_summary is not None and other_summary.b2b_sales == "Yes"
         )
         if not b2c and not b2b:
-            return "Unqualified - Junk Lead / No Shipping"
+            return "Unqualified – Junk Lead / No Shipping"
 
         return "Lift Prime"
