@@ -289,7 +289,7 @@ class ProductionSheetStrategy(BaseSheetStrategy):
             else:
                 seen.append({"row_no": index, "domain": r.company_url})
 
-        self.save_skipped_results(seen)
+        self.save_skipped_results([r["domain"] for r in seen])
         logger.info(
             "Filtered %d records: %d unseen, %d already in history",
             len(records),
