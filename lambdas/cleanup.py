@@ -52,7 +52,8 @@ def handler(event: dict, context: Any) -> dict:
         if workflow_mode == "production"
         else RegularSheetStrategy(handler_)
     )
-
+    print(all_processed)
+    print(all_failed)
     strategy.save_results(all_processed, all_failed)
 
     saved_count = 0
@@ -67,13 +68,13 @@ def handler(event: dict, context: Any) -> dict:
         logger.info(f"Cleanup complete: {saved_count} saved, rows deleted")
 
     # 2. Delete S3 staging files
-    if job_id:
-        keys = s3.list_objects(f"staging/{job_id}/")
-        if keys:
-            s3.delete_objects(keys)
-            logger.info(f"Cleaned up {len(keys)} staging files for job {job_id}")
-        else:
-            logger.info(f"No staging files found for job {job_id}")
+    # if job_id:
+    #     keys = s3.list_objects(f"staging/{job_id}/")
+    #     if keys:
+    #         s3.delete_objects(keys)
+    #         logger.info(f"Cleaned up {len(keys)} staging files for job {job_id}")
+    #     else:
+    #         logger.info(f"No staging files found for job {job_id}")
 
     logger.info(f"Job {job_id}: {saved_count} saved, {len(all_failed)} failed")
     return {"saved": saved_count, "deleted": saved_count}
