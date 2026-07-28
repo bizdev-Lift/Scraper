@@ -335,10 +335,10 @@ class ProductionSheetStrategy(BaseSheetStrategy):
             self.error_sheet.append_rows(rows, value_input_option="USER_ENTERED", table_range="A1")
             time.sleep(0.5)
 
-    def save_skipped_results(self, skipped: list[DomainInput]):
+    def save_skipped_results(self, skipped_domains: list[str]):
         scrape_date_str = datetime.datetime.now().strftime("%m-%d-%Y")
-        if skipped:
-            rows = [[r.company_url, scrape_date_str] for r in skipped]
+        if skipped_domains:
+            rows = [[domain, scrape_date_str] for domain in skipped_domains]
             self.skip_sheet.append_rows(rows, value_input_option="USER_ENTERED", table_range="A1")
             time.sleep(0.5)
 
