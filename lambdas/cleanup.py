@@ -58,7 +58,7 @@ def handler(event: dict, context: Any) -> dict:
     # Merge skipped items into failed so save_results writes them to skip sheet
     all_failed.extend(all_skipped)
 
-    strategy.save_results(all_processed, all_failed)
+    strategy.save_results(all_processed, all_failed, all_skipped)
 
     saved_count = 0
 
