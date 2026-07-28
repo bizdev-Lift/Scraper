@@ -205,7 +205,7 @@ Only if at least one keyword is FOUND, continue to the verification steps below.
 - **Medical:** Medical devices, clinical equipment, patient care tools, pharmaceutical products, healthcare supplies.
   - *Signals:* FDA clearance/approval mentions, HIPAA language, clinical terminology, device classification numbers, "sterile", prescription-only language
 
-- **Other:** Use ONLY when you have clearly identified the industry but it does not match ANY of the categories above. Examples: jewelry, pet supplies, toys, office supplies, arts & crafts, books, musical instruments, software, pure service businesses. Do NOT use "Other" as a fallback when uncertain — use "NA" for uncertainty instead.
+- **Other:** Use ONLY when you have clearly identified the industry but it does not match ANY of the categories above. Examples: jewelry, pet supplies, toys, office supplies, arts & crafts, books, musical instruments, software, pure service businesses. Do NOT use "Other" as a fallback when uncertain — use "Unknown" for uncertainty instead.
 
 - **Mixed:** Use when the site clearly and equally sells products from TWO OR MORE of the listed industry categories above. Both categories must be identifiable from primary navigation, hero content, or product listings — not just a minor secondary offering.
   - Example: A site selling both motorcycle parts AND motorcycle apparel → **Mixed**
@@ -229,11 +229,11 @@ Only if at least one keyword is FOUND, continue to the verification steps below.
 3. If they all map to a SINGLE listed category → return that category
 4. If they clearly map to TWO OR MORE listed categories with roughly equal presence → return **Mixed**
 5. If the industry is clearly identifiable but still has NO semantic match in the list after checking the table → return **Other**
-6. If evidence is genuinely insufficient to identify the industry → return **NA**
+6. If evidence is genuinely insufficient to identify the industry → return **Unknown**
 7. The returned value should be equal to the alllowed values above. We don't want **Mixed (cosmetics + food and beverage)**. We need only **Mixed** in this case.
 
-⛔ Do NOT use "Other" when you are uncertain — "Other" means "I identified the industry but it genuinely has no match in the list." Uncertainty = "NA".
-⛔ Do NOT use "Other" or "NA" when a semantic match exists in the table below — always map to the closest listed category first.
+⛔ Do NOT use "Other" when you are uncertain — "Other" means "I identified the industry but it genuinely has no match in the list." Uncertainty = "Unknown".
+⛔ Do NOT use "Other" or "Unknown" when a semantic match exists in the table below — always map to the closest listed category first.
 ⛔ Do NOT use "Mixed" for a dominant category with minor secondary products — use Mixed only when two or more listed categories have roughly equal weight on the page.
 
 **Semantic mapping table — map what you see on the page to the correct classification:**
@@ -347,9 +347,9 @@ Scan ALL href attributes in the HTML for these patterns:
 **Priority rule:** Trust Signal Type 1 (URL patterns) first, then Type 2 (scripts), then Types 3-5.
 
 **Available Options:**
-Miva Merchant, Web Shop Manager, Cart Functionality, Ecwid, Squarespace, Wix, SmartEtailing, Revolution Parts, Volusion, Demandware, Webflow, Sana Commerce, Woo Commerce, Magento, Second Phase, Shopify, Webjaguar, nopCommerce, Weblink Corp, NA, 3D Cart, BV Commerce, Work Area, ARI, Big Commerce, Netsuite, X-Cart, Prestashop, SAP Commerce, SAP Commerce Cloud, Drupal Commerce, Salesforce Commerce Cloud, Zen Cart
+Miva Merchant, Web Shop Manager, Cart Functionality, Ecwid, Squarespace, Wix, SmartEtailing, Revolution Parts, Volusion, Demandware, Webflow, Sana Commerce, Woo Commerce, Magento, Second Phase, Shopify, Webjaguar, nopCommerce, Weblink Corp, Unknown, 3D Cart, BV Commerce, Work Area, ARI, Big Commerce, Netsuite, X-Cart, Prestashop, SAP Commerce, SAP Commerce Cloud, Drupal Commerce, Salesforce Commerce Cloud, Zen Cart
 
-**Return "NA" if:** No signals from any of the 5 types above match any platform. Do not guess based on visual appearance or design alone.
+**Return "Unknown" if:** No signals from any of the 5 types above match any platform. Do not guess based on visual appearance or design alone.
 
 **CRITICAL: DO NOT consider elements with `display: none;`, `visibility: hidden;`, or similar styling that hides content from the user OR if any PARENT element has `display: none;`, `visibility: hidden;`, or similar styling.**
 
@@ -584,7 +584,7 @@ Miva Merchant, Web Shop Manager, Cart Functionality, Ecwid, Squarespace, Wix, Sm
 
 2. **Visible Content Only:** Base ALL answers exclusively on content that is visible in the provided HTML. **CHECK THE CLASSES AND MAKE SURE THEY DON'T HAVE `display: none` OR `visibility: hidden` IN THEM, EITHER DIRECTLY IN THE STYLE ATTRIBUTE OR IN A CSS CLASS. ALSO, ENSURE THAT NO PARENT ELEMENT OF THE TAG HAS THESE STYLES APPLIED.** This is the MOST IMPORTANT RULE.
 
-3. **No Assumptions:** Don't infer or guess. If information isn't explicitly visible and meeting the criteria, answer accordingly (No, NA, or empty string).
+3. **No Assumptions:** Don't infer or guess. If information isn't explicitly visible and meeting the criteria, answer accordingly (No, Unknown, NA, or empty string).
 
 4. **Consistency:** Provide identical answers for identical content. Don't introduce randomness.
 
