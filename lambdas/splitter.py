@@ -22,12 +22,12 @@ def handler(event: dict, context: Any) -> dict:
         if workflow_mode == "production"
         else RegularSheetStrategy(handler_)
     )
-    records = strategy.get_records()
+    seen_records, unseen_records = strategy.get_records()
 
     job_id = str(uuid.uuid4())
     chunks = []
-    for i in range(0, len(records), CHUNK_SIZE):
-        chunk_records = records[i : i + CHUNK_SIZE]
+    for i in range(0, len(unseen_records), CHUNK_SIZE):
+        chunk_records = unseen_records[i : i + CHUNK_SIZE]
         chunks.append(
             {
                 "chunk_id": i // CHUNK_SIZE,
@@ -37,5 +37,10 @@ def handler(event: dict, context: Any) -> dict:
             }
         )
 
-    logger.info(f"Split {len(records)} records into {len(chunks)} chunks (job_id={job_id})")
-    return {"workflow_mode": workflow_mode, "job_id": job_id, "chunks": chunks}
+    logger.info(f"Split {len(unseen_records)} records into {len(chunks)} chunks (job_id={job_id})")
+    return {
+        "workflow_mode": workflow_mode,
+        "job_id": job_id,
+        "chunks": chunks,
+        "skipped_records": seen_records,
+    }

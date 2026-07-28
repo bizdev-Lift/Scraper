@@ -18,6 +18,7 @@ def handler(event: dict, context: Any) -> dict:
     """Read staged worker results from S3, batch save to sheets, delete processed rows."""
     workflow_mode = event.get("workflow_mode", "regular")
     job_id = event.get("job_id", "")
+    all_skipped = event.get("skipped_records", [])
 
     if not job_id:
         logger.error("No job_id in event")
@@ -54,15 +55,17 @@ def handler(event: dict, context: Any) -> dict:
     )
     print(all_processed)
     print(all_failed)
-    strategy.save_results(all_processed, all_failed)
+    # strategy.save_results(all_processed, all_failed)
 
     saved_count = 0
 
-    if workflow_mode == "production" and all_processed:
+    if workflow_mode == "production":
         records = [
             DomainInput(row_no=item["row_no"], company_url=item["domain"])
-            for item in (all_processed + all_failed)
+            for item in (all_processed + all_failed, all_skipped)
         ]
+        print("Records to delete")
+        print(records)
         strategy.on_complete(records, job_id=job_id)
         saved_count = len(records)
         logger.info(f"Cleanup complete: {saved_count} saved, rows deleted")

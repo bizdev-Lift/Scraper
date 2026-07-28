@@ -287,17 +287,16 @@ class ProductionSheetStrategy(BaseSheetStrategy):
             if r.company_url.lower() not in history_domains:
                 unseen.append(r)
             else:
-                seen.append(r)
+                seen.append(r.company_url)
 
         self.save_skipped_results(seen)
-        self.on_complete(seen)
         logger.info(
             "Filtered %d records: %d unseen, %d already in history",
             len(records),
             len(unseen),
             len(records) - len(unseen),
         )
-        return unseen
+        return seen, unseen
 
     def is_seen(self, record: DomainInput) -> bool:
         return record.company_url.lower() in self.history_domains
