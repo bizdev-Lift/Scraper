@@ -59,7 +59,8 @@ def handler(event: dict, context: Any) -> dict:
 
     if workflow_mode == "production" and all_processed:
         records = [
-            DomainInput(row_no=item["row_no"], company_url=item["domain"]) for item in all_processed
+            DomainInput(row_no=item["row_no"], company_url=item["domain"])
+            for item in (all_processed + all_failed)
         ]
         strategy.on_complete(records, job_id=job_id)
         saved_count = len(records)
