@@ -55,7 +55,7 @@ def handler(event: dict, context: Any) -> dict:
     )
     print(all_processed)
     print(all_failed)
-    # strategy.save_results(all_processed, all_failed)
+    strategy.save_results(all_processed, all_failed)
 
     saved_count = 0
 
