@@ -24,9 +24,19 @@ def handler(event: dict, context: Any) -> dict:
         logger.error("No job_id in event")
         return {"saved": 0, "deleted": 0}
 
+    handler_ = GoogleSheetsHandler(settings.spreadsheet_info)
+    strategy = (
+        ProductionSheetStrategy(handler_)
+        if workflow_mode == "production"
+        else RegularSheetStrategy(handler_)
+    )
     prefix = f"staging/{job_id}/"
     keys = s3.list_objects(prefix)
     if not keys:
+        records = [
+            DomainInput(row_no=item["row_no"], company_url=item["domain"]) for item in all_skipped
+        ]
+        strategy.on_complete(records, job_id=job_id)
         logger.info(f"No staged results found at {prefix}")
         return {"saved": 0, "deleted": 0}
 
@@ -47,12 +57,6 @@ def handler(event: dict, context: Any) -> dict:
         logger.info("No results to save")
         return {"saved": 0, "deleted": 0}
 
-    handler_ = GoogleSheetsHandler(settings.spreadsheet_info)
-    strategy = (
-        ProductionSheetStrategy(handler_)
-        if workflow_mode == "production"
-        else RegularSheetStrategy(handler_)
-    )
     print(all_processed)
     print(all_failed)
     strategy.save_results(all_processed, all_failed)
