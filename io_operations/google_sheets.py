@@ -392,11 +392,11 @@ class ProductionSheetStrategy(BaseSheetStrategy):
         scrape_date_str = datetime.datetime.now().strftime("%m-%d-%Y")
 
         if status == "success" and output:
-            # payload = HubSpotDataMapper.map_to_hubspot_payload(domain_input, output)
-            # result = self.hubspot_client.add_company(payload)
-            # if not result.get("success"):
-            #     logger.error(f"HubSpot error for {domain_input.company_url}: {result}")
-            #     raise GoogleSheetsError(f"Failed to save to HubSpot: {domain_input.company_url}")
+            payload = HubSpotDataMapper.map_to_hubspot_payload(domain_input, output)
+            result = self.hubspot_client.add_company(payload)
+            if not result.get("success"):
+                logger.error(f"HubSpot error for {domain_input.company_url}: {result}")
+                raise GoogleSheetsError(f"Failed to save to HubSpot: {domain_input.company_url}")
 
             record = [
                 domain_input.company_url,
