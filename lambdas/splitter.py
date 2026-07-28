@@ -1,4 +1,5 @@
 import os
+import uuid
 from typing import Any
 
 from config import settings
@@ -23,6 +24,7 @@ def handler(event: dict, context: Any) -> dict:
     )
     records = strategy.get_records()
 
+    job_id = str(uuid.uuid4())
     chunks = []
     for i in range(0, len(records), CHUNK_SIZE):
         chunk_records = records[i : i + CHUNK_SIZE]
@@ -31,8 +33,9 @@ def handler(event: dict, context: Any) -> dict:
                 "chunk_id": i // CHUNK_SIZE,
                 "domains": [{"domain": r.company_url, "row_no": r.row_no} for r in chunk_records],
                 "workflow_mode": workflow_mode,
+                "job_id": job_id,
             }
         )
 
-    logger.info(f"Split {len(records)} records into {len(chunks)} chunks")
-    return {"workflow_mode": workflow_mode, "chunks": chunks}
+    logger.info(f"Split {len(records)} records into {len(chunks)} chunks (job_id={job_id})")
+    return {"workflow_mode": workflow_mode, "job_id": job_id, "chunks": chunks}

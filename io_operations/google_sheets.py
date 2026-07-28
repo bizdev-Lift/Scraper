@@ -94,6 +94,9 @@ class BaseSheetStrategy(ABC):
     @abstractmethod
     def on_complete(self, records: list[DomainInput]) -> None: ...
 
+    @abstractmethod
+    def save_results(self, processed: list[dict], failed: list[dict]) -> None: ...
+
     @property
     def pre_enrich(self) -> bool:
         return False
@@ -165,6 +168,39 @@ class RegularSheetStrategy(BaseSheetStrategy):
 
     def on_error(self, record: DomainInput, output: DomainResponse) -> None:
         self._update(record, output)
+
+    def save_results(self, processed: list[dict], failed: list[dict]) -> None:
+        cells = []
+        for item in processed:
+            data = item.get("data", {})
+            row = [
+                data.get("hq_phone_no", ""),
+                data.get("website_availability", ""),
+                data.get("hq_address_listed", ""),
+                data.get("b2c_sales", ""),
+                data.get("b2b_sales", ""),
+                data.get("industry_classification", ""),
+                data.get("ecommerce_platform", ""),
+                data.get("lead_status", ""),
+                data.get("revenue", ""),
+                data.get("shipping_messaging", ""),
+                data.get("shipping_methods", ""),
+                data.get("carriers", ""),
+                data.get("product_size_weight", ""),
+                data.get("smallest_product_dim", ""),
+                data.get("smallest_product_cubic_size", ""),
+                data.get("smallest_product_name", ""),
+                data.get("largest_product_dim", ""),
+                data.get("largest_product_cubic_size", ""),
+                data.get("largest_product_name", ""),
+                data.get("redirected_to", ""),
+                data.get("old_lead_status", ""),
+            ]
+            for i, val in enumerate(row):
+                cells.append(gspread.Cell(item["row_no"], i + 3, val))
+        if cells:
+            self.sheet.batch_update(cells)
+        time.sleep(0.5)
 
     def on_complete(self, records: list[DomainInput]) -> None:
         pass  # No cleanup needed in regular mode
@@ -269,7 +305,71 @@ class ProductionSheetStrategy(BaseSheetStrategy):
     def on_error(self, record: DomainInput, output: DomainResponse) -> None:
         self._append(self.error_sheet, record, output, status="error")
 
-    def on_complete(self, records: list[DomainInput]) -> None:
+    def save_results(self, processed: list[dict], failed: list[dict], skipped: list[dict]) -> None:
+        scrape_date_str = datetime.datetime.now().strftime("%m-%d-%Y")
+
+        # 1. HubSpot (Successes only)
+        hubspot_payloads = [p["hubspot_payload"] for p in processed if p.get("hubspot_payload")]
+        if hubspot_payloads:
+            combined = self.hubspot_client.add_companies(hubspot_payloads)
+            for err in combined.get("errors", []):
+                logger.error(f"HubSpot batch error: {err}")
+
+        # 2. Good Sheet (Successes)
+        if processed:
+            rows = [
+                self._build_success_row(p["domain"], p.get("data", {}), scrape_date_str)
+                for p in processed
+            ]
+            self.good_sheet.append_rows(rows, value_input_option="USER_ENTERED")
+            time.sleep(0.5)
+
+        # 3. Error Sheet (Errors)
+        if failed:
+            rows = [[p["domain"], p.get("error", "Unknown Error"), scrape_date_str] for p in failed]
+            self.error_sheet.append_rows(rows, value_input_option="USER_ENTERED")
+            time.sleep(0.5)
+
+        # 4. Skip Sheet (Skips/Failed)
+        if skipped:
+            rows = [[p["domain"], scrape_date_str] for p in skipped]
+            self.skip_sheet.append_rows(rows, value_input_option="USER_ENTERED")
+            time.sleep(0.5)
+
+    def _build_success_row(self, domain: str, data: dict, scrape_date: str) -> list:
+        apollo = data.get("apollo_result", {})
+        seamless = data.get("seamless_result", {})
+        return [
+            domain,
+            domain,
+            domain,
+            data.get("hq_phone_no", ""),
+            data.get("website_availability", ""),
+            data.get("hq_address_listed", ""),
+            data.get("b2c_sales", ""),
+            data.get("b2b_sales", ""),
+            data.get("industry_classification", ""),
+            data.get("ecommerce_platform", ""),
+            data.get("lead_status", ""),
+            data.get("revenue", ""),
+            data.get("shipping_messaging", ""),
+            data.get("shipping_methods", ""),
+            data.get("carriers", ""),
+            data.get("product_size_weight", ""),
+            data.get("smallest_product_dim", ""),
+            data.get("smallest_product_cubic_size", ""),
+            data.get("smallest_product_name", ""),
+            data.get("largest_product_dim", ""),
+            data.get("largest_product_cubic_size", ""),
+            data.get("largest_product_name", ""),
+            data.get("redirected_to", ""),
+            *apollo.values(),
+            *seamless.values(),
+            scrape_date,
+        ]
+
+    def on_complete(self, records: list[DomainInput], job_id: str = None) -> None:
+        # 1. Delete rows from input sheet
         row_numbers = sorted([r.row_no for r in records], reverse=True)
         logger.info(f"Total rows to delete: {len(row_numbers)}")
         for row_no in row_numbers:

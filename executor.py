@@ -92,7 +92,7 @@ class MainExecutor:
             seamless_result=SeamlessResult(),
         )
 
-    def _process_record(self, record: DomainInput) -> Optional[DomainResponse]:
+    def _process_record(self, record: DomainInput) -> tuple[str, DomainResponse]:
         """Process a single record and return the summary, or None on failure."""
         default_summary = self._get_default_summary()
 
@@ -110,13 +110,14 @@ class MainExecutor:
         if not result.body:
             logger.error(f"Unable to scrape url={record.company_url}. Returning default summary.")
             self.strategy.on_error(record, default_summary)
-            return None
+            return "error", default_summary
 
         if result.is_blocked:
             logger.error(f"url={record.company_url} has been blocked. Returning default summary.")
             default_summary.lead_status = "Unqualified - Website Blocked"
             self.strategy.on_error(record, default_summary)
-            return None
+            return "skip", default_summary
+            # return None
 
         website_url = self._determine_website_url(record.company_url, result.domain_url)
         redirected_to: Optional[str] = None
@@ -137,8 +138,9 @@ class MainExecutor:
             )
             if not final_summary_json:
                 default_summary.lead_status = "Error: LLM Failed"
-            self.strategy.on_error(record, default_summary)
-            return None
+            # self.strategy.on_error(record, default_summary)
+            return "error", default_summary
+            # return None
 
         about_contact_summary_json: Optional[DomainResponse] = None
         if self._needs_additional_scraping(final_summary_json):
@@ -159,7 +161,7 @@ class MainExecutor:
             merged_summary.redirected_to = redirected_to
 
         logger.info(f"Summary extracted against url={website_url}.")
-        return merged_summary
+        return "success", merged_summary
 
     def fetch_revenue(self, company_url: str) -> Optional[float]:
         base_url = URL("https://www.google.com/search")
@@ -326,14 +328,11 @@ class MainExecutor:
         domain_url: str,
         apollo_result: Optional[ApolloResult] = None,
         seamless_result: Optional[SeamlessResult] = None,
-    ) -> Optional[DomainResponse]:
+    ) -> tuple[str, DomainResponse]:
         """Process a single domain URL without strategy side effects."""
         record = DomainInput(row_no=0, company_url=domain_url)
-        result = self._process_record(record)
-        if not result:
-            return result
-
-        if self.strategy.pre_enrich:
+        mode, result = self._process_record(record)
+        if mode == "success" and self.strategy.pre_enrich:
             if result.redirected_to:
                 redirected_to_domain = re.sub(r"http(s)?://(www\.)?", "", result.redirected_to)
                 apollo_result = self.apollo_api.enrich_leads([redirected_to_domain])
@@ -343,7 +342,7 @@ class MainExecutor:
             else:
                 result.apollo_result = apollo_result
                 result.seamless_result = seamless_result
-        return result
+        return mode, result
 
     def compute_lead_status(
         self, homepage_summary: DomainResponse, other_summary: Optional[DomainResponse]
