@@ -65,7 +65,7 @@ def handler(event: dict, context: Any) -> dict:
                         "domain": record.company_url,
                         "row_no": record.row_no,
                         "data": asdict(result),
-                        "error": "Processing failed because of an error.",
+                        "error": result.lead_status,
                     }
                 )
                 logger.error(f"Failed to process domain={record.company_url}")
