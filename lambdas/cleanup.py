@@ -61,9 +61,14 @@ def handler(event: dict, context: Any) -> dict:
 
     if workflow_mode == "production":
         records = [
-            DomainInput(row_no=item["row_no"], company_url=item["domain"])
-            for item in (all_processed + all_failed, all_skipped)
+            DomainInput(row_no=item["row_no"], company_url=item["domain"]) for item in all_skipped
         ]
+        records.extend(
+            [
+                DomainInput(row_no=item["row_no"], company_url=item["domain"])
+                for item in (all_processed + all_failed)
+            ]
+        )
         print("Records to delete")
         print(records)
         strategy.on_complete(records, job_id=job_id)

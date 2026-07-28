@@ -287,7 +287,7 @@ class ProductionSheetStrategy(BaseSheetStrategy):
             if r.company_url.lower() not in history_domains:
                 unseen.append(r)
             else:
-                seen.append(r.company_url)
+                seen.append({"row_no": index, "domain": r.company_url})
 
         self.save_skipped_results(seen)
         logger.info(
