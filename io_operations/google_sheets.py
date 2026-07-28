@@ -315,11 +315,11 @@ class ProductionSheetStrategy(BaseSheetStrategy):
         scrape_date_str = datetime.datetime.now().strftime("%m-%d-%Y")
 
         # 1. HubSpot (Successes only)
-        # hubspot_payloads = [p["hubspot_payload"] for p in processed if p.get("hubspot_payload")]
-        # if hubspot_payloads:
-        #     combined = self.hubspot_client.add_companies(hubspot_payloads)
-        #     for err in combined.get("errors", []):
-        #         logger.error(f"HubSpot batch error: {err}")
+        hubspot_payloads = [p["hubspot_payload"] for p in processed if p.get("hubspot_payload")]
+        if hubspot_payloads:
+            combined = self.hubspot_client.add_companies(hubspot_payloads)
+            for err in combined.get("errors", []):
+                logger.error(f"HubSpot batch error: {err}")
 
         # 2. Good Sheet (Successes)
         if processed:
