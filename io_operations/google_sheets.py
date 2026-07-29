@@ -316,9 +316,21 @@ class ProductionSheetStrategy(BaseSheetStrategy):
         # 1. HubSpot (Successes only)
         hubspot_payloads = [p["hubspot_payload"] for p in processed if p.get("hubspot_payload")]
         if hubspot_payloads:
-            combined = self.hubspot_client.add_companies(hubspot_payloads)
-            for err in combined.get("errors", []):
-                logger.error(f"HubSpot batch error: {err}")
+            # combined = self.hubspot_client.add_companies(hubspot_payloads)
+            for payload in hubspot_payloads:
+                if payload["domain"] != "alliedtime.com":
+                    continue
+
+                payload["properties"]["apollo_industry_fixed"] = payload["properties"][
+                    "apollo_industry"
+                ]
+                del payload["properties"]["apollo_industry"]
+                result = self.hubspot_client.add_company(payload)
+                if not result["success"]:
+                    logger.error(f"HubSpot batch error: {result['error']}")
+
+            # for err in combined_results.get("errors", []):
+            #     logger.error(f"HubSpot batch error: {err}")
 
         # 2. Good Sheet (Successes)
         if processed:
@@ -484,7 +496,7 @@ class HubSpotDataMapper:
                 "scraper_carriers": get_str(output.carriers),
                 "scraper_product_size": get_str(output.product_size_weight),
                 "hs_redirect_domain": get_str(output.redirected_to),
-                "apollo_industry": get_str(output.apollo_result.industry),
+                "apollo_industry_fixed": get_str(output.apollo_result.industry),
                 "hq_phone_number_apollo": get_str(output.apollo_result.company_phone),
                 "apollo___of_retail_locations": get_str(output.apollo_result.company_state),
                 "apollo_annual_revenue_number_fix_use_this": get_str(

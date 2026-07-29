@@ -51,23 +51,34 @@ class HubSpotCompaniesClient:
 
     def add_company(self, record: dict) -> dict:
         """
-        Create or update a single company in HubSpot, keyed by domain.
+        Create a single company in HubSpot.
 
         record: e.g.
-            ``{"domain": "example.com", "properties": {"name": "Example Inc", "industry": "SAAS"}}``
+            ``{"domain": "example.com", "properties": {"name": "Example Inc",
+            "industry": "SAAS"}}``
 
-        Thin wrapper around add_companies() for the single-record case.
+        Calls HubSpot's simple create endpoint directly
+        (POST /crm/v3/objects/companies), rather than routing through
+        add_companies()'s batch create.
+
         Returns:
             {"success": True, "result": {...}} on success
             {"success": False, "error": {...}} on failure
         """
-        combined = self.add_companies([record])
+        body = {"properties": record["properties"]}
 
-        if combined["errors"]:
-            return {"success": False, "error": combined["errors"][0]}
-
-        results = combined["results"]
-        return {"success": True, "result": results[0] if results else None}
+        try:
+            result = self._post("/crm/v3/objects/companies", body, mode="post")
+            return {"success": True, "result": result}
+        except requests.HTTPError as e:
+            return {
+                "success": False,
+                "error": {
+                    "domain": record.get("domain"),
+                    "status_code": e.response.status_code if e.response is not None else None,
+                    "detail": e.response.text if e.response is not None else str(e),
+                },
+            }
 
     def add_companies(self, records: list[dict]) -> dict:
         """
