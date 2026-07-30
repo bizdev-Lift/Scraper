@@ -79,7 +79,7 @@ def handler(event: dict, context: Any) -> dict:
             )
             logger.exception(f"Error processing domain={record.company_url}")
 
-    s3_key = f"staging/{job_id}/{chunk_id}.json"
+    s3_key = f"staging/{workflow_mode}/{job_id}/{chunk_id}.json"
     s3.write_raw_content(s3_key, json.dumps({"processed": processed, "failed": failed}))
 
     logger.info(

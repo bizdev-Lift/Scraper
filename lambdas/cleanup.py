@@ -24,7 +24,7 @@ def handler(event: dict, context: Any) -> dict:
 
     strategy = _create_strategy(workflow_mode)
 
-    processed, failed, staging_keys = _read_staged_results(job_id)
+    processed, failed, staging_keys = _read_staged_results(workflow_mode, job_id)
 
     if processed or failed:
         strategy.save_results(processed, failed)
@@ -51,9 +51,9 @@ def _create_strategy(workflow_mode: str):
     )
 
 
-def _read_staged_results(job_id: str) -> tuple[list, list, list]:
+def _read_staged_results(workflow_mode: str, job_id: str) -> tuple[list, list, list]:
     processed, failed = [], []
-    keys = s3.list_objects(f"staging/{job_id}/")
+    keys = s3.list_objects(f"staging/{workflow_mode}/{job_id}/")
     for key in keys:
         content = s3.read_content(key)
         if content is None:
