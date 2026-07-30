@@ -1,0 +1,258 @@
+service: bizdev-scraper
+
+frameworkVersion: "3"
+
+plugins:
+  - serverless-step-functions
+
+provider:
+  name: aws
+  region: us-east-1
+  timeout: 900
+  memorySize: 512
+  logRetentionInDays: 14
+  environment:
+    APOLLO_API_KEY: ${env:APOLLO_API_KEY, ""}
+    AWS_BUCKET_NAME:
+      Ref: DomainHtmlStorageBucket
+    CREDENTIALS_PATH: ${env:CREDENTIALS_PATH, ""}
+    ERROR_RESULTS_SHEET: ${env:ERROR_RESULTS_SHEET, ""}
+    GEMINI_API_KEY: ${env:GEMINI_API_KEY, ""}
+    GOOD_RESULTS_SHEET: ${env:GOOD_RESULTS_SHEET, ""}
+    HUBSPOT_API_KEY: ${env:HUBSPOT_API_KEY, ""}
+    MAX_INPUT_RECORDS: ${env:MAX_INPUT_RECORDS, ""}
+    MODEL_NAME: ${env:MODEL_NAME, ""}
+    SEAMLESS_API_KEY: ${env:SEAMLESS_API_KEY, ""}
+    SHEET_NAME: ${env:SHEET_NAME, ""}
+    SINGLE_SPREADSHEET_ID: ${env:SINGLE_SPREADSHEET_ID, ""}
+    SINGLE_SHEET_NAME: ${env:SINGLE_SHEET_NAME, ""}
+    SKIP_RESULTS_SHEET: ${env:SKIP_RESULTS_SHEET, ""}
+    SPREADSHEET_ID: ${env:SPREADSHEET_ID, ""}
+    STATS_SHEET: ${env:STATS_SHEET, ""}
+    STATS_SPREADSHEET_ID: ${env:STATS_SPREADSHEET_ID, ""}
+    WORKFLOW_MODE: ${env:WORKFLOW_MODE, "production"}
+    ZYTE_API_KEY: ${env:ZYTE_API_KEY}
+    ZYTE_ENABLED: ${env:ZYTE_ENABLED}
+    CHUNK_SIZE: ${env:CHUNK_SIZE, "5"}
+    ENVIRONMENT: ${env:ENVIRONMENT, "prod"}
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - s3:GetObject
+            - s3:PutObject
+            - s3:DeleteObject
+            - s3:ListBucket
+          Resource:
+            - Fn::Sub: arn:aws:s3:::${DomainHtmlStorageBucket}
+            - Fn::Sub: arn:aws:s3:::${DomainHtmlStorageBucket}/*
+        - Effect: Allow
+          Action:
+            - states:StartExecution
+            - states:DescribeExecution
+          Resource:
+            - "*"
+
+custom:
+  # Set custom names to match current resources but allow replacements
+  # CloudFormation cannot update a stack when a custom-named resource changes format (e.g., zip to image).
+  # If you get resource-replacement errors during migration, run serverless deploy again.
+
+package:
+  patterns:
+    - "!.env"
+    - "!credentials*.json"
+    - "!old-credentials.json"
+    - "!.venv/**"
+    - "!__pycache__/**"
+    - "!.history/**"
+    - "!.git/**"
+    - "!frontend/**"
+    - "!tests/**"
+    - "!.pre-commit-config.yaml"
+    - "!.flake8"
+    - "!README.md"
+    - "!.serverless/**"
+    - "!.gitignore"
+    - "!.python-version"
+    - "!uv.lock"
+    - "!architecture_diagram.png"
+    - "!test.html"
+    - "!domain_properties.json"
+    - "!.vscode/**"
+    - "!.DS_Store"
+    - "!node_modules/**"
+    - "!package.json"
+    - "!package-lock.json"
+
+functions:
+  domain-splitter:
+    name: domain-splitter
+    image:
+      uri: ${env:ECR_IMAGE_URI, "383488877661.dkr.ecr.us-east-1.amazonaws.com/llm-data-extractor:latest"}
+      command:
+        - lambdas.splitter.handler
+    timeout: 120
+    memorySize: 256
+
+  domain-worker:
+    name: domain-worker
+    image:
+      uri: ${env:ECR_IMAGE_URI, "383488877661.dkr.ecr.us-east-1.amazonaws.com/llm-data-extractor:latest"}
+      command:
+        - lambdas.worker.handler
+    timeout: 900
+    memorySize: 1024
+
+  domain-cleanup:
+    name: domain-cleanup
+    image:
+      uri: ${env:ECR_IMAGE_URI, "383488877661.dkr.ecr.us-east-1.amazonaws.com/llm-data-extractor:latest"}
+      command:
+        - lambdas.cleanup.handler
+    timeout: 120
+    memorySize: 256
+
+resources:
+  Resources:
+    DomainHtmlStorageBucket:
+      Type: AWS::S3::Bucket
+      DeletionPolicy: Retain
+
+
+    DomainDataExtractorSchedulerRole:
+      Type: AWS::IAM::Role
+      Properties:
+        AssumeRolePolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service: scheduler.amazonaws.com
+              Action: sts:AssumeRole
+        Policies:
+          - PolicyName: InvokeStepFunctions
+            PolicyDocument:
+              Version: "2012-10-17"
+              Statement:
+                - Effect: Allow
+                  Action: states:StartExecution
+                  Resource:
+                    - Fn::Sub: arn:aws:states:${AWS::Region}:${AWS::AccountId}:stateMachine:DomainDataExtractorStateMachine
+                    - Fn::Sub: arn:aws:states:${AWS::Region}:${AWS::AccountId}:stateMachine:DomainDataExtractorStateMachine_SingleSheet
+
+
+    DomainDataExtractorScheduler:
+      Type: AWS::Scheduler::Schedule
+      Properties:
+        Name: DomainDataExtractorScheduler
+        ScheduleExpression: "rate(15 minutes)"
+        FlexibleTimeWindow:
+          Mode: OFF
+        State: ENABLED
+        Target:
+          Arn:
+            Fn::Sub: arn:aws:states:${AWS::Region}:${AWS::AccountId}:stateMachine:DomainDataExtractorStateMachine
+          RoleArn:
+            Fn::GetAtt:
+              - DomainDataExtractorSchedulerRole
+              - Arn
+
+    DomainDataExtractorSingleSheetScheduler:
+      Type: AWS::Scheduler::Schedule
+      Properties:
+        Name: DomainDataExtractorScheduler_SingleSheet
+        ScheduleExpression: "rate(15 minutes)"
+        FlexibleTimeWindow:
+          Mode: OFF
+        State: ENABLED
+        Target:
+          Arn:
+            Fn::Sub: arn:aws:states:${AWS::Region}:${AWS::AccountId}:stateMachine:DomainDataExtractorStateMachine_SingleSheet
+          RoleArn:
+            Fn::GetAtt:
+              - DomainDataExtractorSchedulerRole
+              - Arn
+
+stepFunctions:
+  stateMachines:
+    domain-processing-pipeline:
+      name: DomainDataExtractorStateMachine
+      definition:
+        Comment: Domain Processing Pipeline — parallel batch processing (production)
+        StartAt: SplitDomains
+        States:
+          SplitDomains:
+            Type: Task
+            Parameters:
+              workflow_mode: "production"
+            Resource:
+              Fn::GetAtt:
+                - domain-splitter
+                - Arn
+            ResultPath: $
+            Next: ProcessChunks
+          ProcessChunks:
+            Type: Map
+            ItemsPath: $.chunks
+            MaxConcurrency: 4
+            ResultPath: $.results
+            Iterator:
+              StartAt: Worker
+              States:
+                Worker:
+                  Type: Task
+                  Resource:
+                    Fn::GetAtt:
+                      - domain-worker
+                      - Arn
+                  End: true
+            Next: Cleanup
+          Cleanup:
+            Type: Task
+            Resource:
+              Fn::GetAtt:
+                - domain-cleanup
+                - Arn
+            End: true
+
+    domain-processing-single-sheet:
+      name: DomainDataExtractorStateMachine_SingleSheet
+      definition:
+        Comment: Domain Processing Pipeline — single sheet (regular)
+        StartAt: SplitDomains
+        States:
+          SplitDomains:
+            Type: Task
+            Parameters:
+              workflow_mode: "regular"
+            Resource:
+              Fn::GetAtt:
+                - domain-splitter
+                - Arn
+            ResultPath: $
+            Next: ProcessChunks
+          ProcessChunks:
+            Type: Map
+            ItemsPath: $.chunks
+            MaxConcurrency: 4
+            ResultPath: $.results
+            Iterator:
+              StartAt: Worker
+              States:
+                Worker:
+                  Type: Task
+                  Resource:
+                    Fn::GetAtt:
+                      - domain-worker
+                      - Arn
+                  End: true
+            Next: Cleanup
+          Cleanup:
+            Type: Task
+            Resource:
+              Fn::GetAtt:
+                - domain-cleanup
+                - Arn
+            End: true
