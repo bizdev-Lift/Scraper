@@ -78,3 +78,43 @@ class S3Client:
         except Exception as e:
             logger.error(f"Failed to read from S3: {e}")
             return None
+
+    def list_objects(self, prefix: str) -> list[str]:
+        """
+        Lists object keys under a given prefix.
+
+        Args:
+            prefix (str): The prefix to filter objects by.
+
+        Returns:
+            list[str]: A list of object keys, or an empty list if none found.
+        """
+        try:
+            response = self.s3.list_objects_v2(Bucket=self.bucket_name, Prefix=prefix)
+            return [obj["Key"] for obj in response.get("Contents", [])]
+        except Exception as e:
+            logger.error(f"Failed to list objects under {prefix}: {e}")
+            return []
+
+    def delete_objects(self, keys: list[str]) -> bool:
+        """
+        Deletes a list of objects from the bucket.
+
+        Args:
+            keys (list[str]): The list of object keys to delete.
+
+        Returns:
+            bool: True if successful, False otherwise.
+        """
+        if not keys:
+            return True
+        try:
+            self.s3.delete_objects(
+                Bucket=self.bucket_name,
+                Delete={"Objects": [{"Key": key} for key in keys]},
+            )
+            logger.info(f"Deleted {len(keys)} objects from s3://{self.bucket_name}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to delete objects from S3: {e}")
+            return False

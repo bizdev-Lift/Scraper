@@ -155,6 +155,12 @@ class LLMHelper:
         logger.info(f"Gemini response status: {response.status_code}")
         return response.json()
 
+        # TODO: This can be used in case of debugging Purposes.
+        # with open("response.json") as f:
+        #     data = f.read()
+        # f.close()
+        # return json.loads(data)
+
     def read_prompt(self, prompt_name: str) -> str:
         prompt_path = os.path.join(self.PROMPT_DIRECTORY, prompt_name)
         with open(prompt_path, "r", encoding="utf-8") as file:

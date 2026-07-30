@@ -1,7 +1,10 @@
 import copy
 import datetime
 import logging
+import os
+import random
 import re
+import time
 from abc import ABC, abstractmethod
 from dataclasses import asdict
 from typing import Any, Literal, Optional
@@ -34,23 +37,30 @@ class GoogleSheetsHandler:
     def _authenticate(self) -> gspread.Client:
         if not self.spreadsheet_info.credentials_path:
             raise GoogleSheetsError("Credentials path not provided.")
-
         try:
             creds = ServiceAccountCredentials.from_json_keyfile_name(
                 self.spreadsheet_info.credentials_path, settings.google_authorization_scope
             )
-            return gspread.authorize(creds)
+            client = gspread.authorize(creds)
+            return client
         except Exception as e:
             logger.error(f"Failed to authorize service account: {e}")
             raise GoogleSheetsError("Service account authorization failed.") from e
 
     def open_sheet(self, sheet_name: str, sheet_id: Optional[str] = None) -> gspread.Worksheet:
-        try:
-            spreadsheet_id = sheet_id or self.spreadsheet_info.spreadsheet_id
-            return self.client.open_by_key(spreadsheet_id).worksheet(sheet_name)
-        except Exception as e:
-            logger.error(f"Unable to load sheet '{sheet_name}': {e}")
-            raise GoogleSheetsError(f"Failed to load sheet: {sheet_name}") from e
+        count = 3
+        while count > 0:
+            try:
+                spreadsheet_id = sheet_id or self.spreadsheet_info.spreadsheet_id
+                return self.client.open_by_key(spreadsheet_id).worksheet(sheet_name)
+            except Exception as e:
+                logger.error(f"Unable to load sheet '{sheet_name}': {e}")
+                logger.error("waiting for 5 seconds")
+                time.sleep(random.randint(0, 10))
+                logger.error("Trying now")
+                count -= 1
+                if count == 0:
+                    raise GoogleSheetsError(f"Failed to load sheet: {sheet_name}") from e
 
     @staticmethod
     def is_domain(input_string: str) -> bool:
@@ -84,6 +94,12 @@ class BaseSheetStrategy(ABC):
 
     @abstractmethod
     def on_complete(self, records: list[DomainInput]) -> None: ...
+
+    @abstractmethod
+    def save_results(self, processed: list[dict], failed: list[dict]) -> None: ...
+
+    @abstractmethod
+    def build_response(self, job_id: str) -> dict: ...
 
     @property
     def pre_enrich(self) -> bool:
@@ -119,7 +135,16 @@ class RegularSheetStrategy(BaseSheetStrategy):
     """Single-sheet: reads and updates records in place."""
 
     def __init__(self, handler: GoogleSheetsHandler):
-        self.sheet = handler.open_sheet(handler.spreadsheet_info.sheet_name)
+        info = handler.spreadsheet_info
+        self.sheet = handler.open_sheet(info.single_sheet_name, info.single_spreadsheet_id)
+
+    @property
+    def pre_enrich(self) -> bool:
+        return True
+
+    @property
+    def track_old_lead_status(self) -> bool:
+        return True
 
     @property
     def pre_enrich(self) -> bool:
@@ -161,8 +186,67 @@ class RegularSheetStrategy(BaseSheetStrategy):
     def on_error(self, record: DomainInput, output: DomainResponse) -> None:
         self._update(record, output)
 
+    def save_results(self, processed: list[dict], failed: list[dict]) -> None:
+        scrape_date_str = datetime.datetime.now().strftime("%m-%d-%Y")
+        cells = []
+        items = processed + failed
+        for item in items:
+            data = item.get("data", {})
+            apollo = data.get("apollo_result", {})
+            seamless = data.get("seamless_result", {})
+            row = [
+                data.get("hq_phone_no", ""),
+                data.get("website_availability", ""),
+                data.get("hq_address_listed", ""),
+                data.get("b2c_sales", ""),
+                data.get("b2b_sales", ""),
+                data.get("industry_classification", ""),
+                data.get("ecommerce_platform", ""),
+                data.get("lead_status", ""),
+                data.get("revenue", ""),
+                data.get("shipping_messaging", ""),
+                data.get("shipping_methods", ""),
+                data.get("carriers", ""),
+                data.get("product_size_weight", ""),
+                data.get("smallest_product_dim", ""),
+                data.get("smallest_product_cubic_size", ""),
+                data.get("smallest_product_name", ""),
+                data.get("largest_product_dim", ""),
+                data.get("largest_product_cubic_size", ""),
+                data.get("largest_product_name", ""),
+                data.get("redirected_to", ""),
+                data.get("old_lead_status", ""),
+                *apollo.values(),
+                *seamless.values(),
+                scrape_date_str,
+            ]
+            for i, val in enumerate(row):
+                cells.append(gspread.Cell(item["row_no"], i + 3, val))
+        if cells:
+            self.sheet.update_cells(cells)
+        time.sleep(0.5)
+
     def on_complete(self, records: list[DomainInput]) -> None:
         pass  # No cleanup needed in regular mode
+
+    def build_response(self, job_id: str) -> dict:
+        records = self.get_records()
+        CHUNK_SIZE = int(os.getenv("CHUNK_SIZE", "5"))
+        chunks = []
+        for i in range(0, len(records), CHUNK_SIZE):
+            chunk_records = records[i : i + CHUNK_SIZE]
+            chunks.append(
+                {
+                    "chunk_id": i // CHUNK_SIZE,
+                    "domains": [
+                        {"domain": r.company_url, "row_no": r.row_no} for r in chunk_records
+                    ],
+                    "workflow_mode": "regular",
+                    "job_id": job_id,
+                }
+            )
+        logger.info(f"Split {len(records)} records into {len(chunks)} chunks (job_id={job_id})")
+        return {"workflow_mode": "regular", "job_id": job_id, "chunks": chunks}
 
     def _update(
         self,
@@ -202,6 +286,7 @@ class RegularSheetStrategy(BaseSheetStrategy):
             )
         else:
             self.sheet.update([row], f"C{domain_input.row_no}")
+        time.sleep(0.5)
 
 
 class ProductionSheetStrategy(BaseSheetStrategy):
@@ -214,7 +299,6 @@ class ProductionSheetStrategy(BaseSheetStrategy):
         self.good_sheet = handler.open_sheet(info.good_results_sheet)
         self.skip_sheet = handler.open_sheet(info.skip_results_sheet)
         self.error_sheet = handler.open_sheet(info.error_results_sheet)
-        self.history_domains = self._load_history_domains()
         self.hubspot_client = HubSpotCompaniesClient(settings.hubspot_api_key)
 
     @property
@@ -238,10 +322,27 @@ class ProductionSheetStrategy(BaseSheetStrategy):
                 records_to_check.append(record[0])
             count -= 1
 
-        self.history_domains = self.history_domains.union(
+        history_domains = self._load_history_domains()
+        history_domains = history_domains.union(
             self.hubspot_client.get_existing_domains(records_to_check)
         )
-        return records
+
+        unseen = []
+        seen = []
+        for r in records:
+            if r.company_url.lower() not in history_domains:
+                unseen.append(r)
+            else:
+                seen.append({"row_no": r.row_no, "domain": r.company_url})
+
+        self.save_skipped_results([r["domain"] for r in seen])
+        logger.info(
+            "Filtered %d records: %d unseen, %d already in history",
+            len(records),
+            len(unseen),
+            len(records) - len(unseen),
+        )
+        return seen, unseen
 
     def is_seen(self, record: DomainInput) -> bool:
         return record.company_url.lower() in self.history_domains
@@ -255,11 +356,116 @@ class ProductionSheetStrategy(BaseSheetStrategy):
     def on_error(self, record: DomainInput, output: DomainResponse) -> None:
         self._append(self.error_sheet, record, output, status="error")
 
-    def on_complete(self, records: list[DomainInput]) -> None:
+    def save_results(self, processed: list[dict], failed: list[dict]) -> None:
+        scrape_date_str = datetime.datetime.now().strftime("%m-%d-%Y")
+
+        # 1. HubSpot (Successes only)
+        hubspot_payloads = [p["hubspot_payload"] for p in processed if p.get("hubspot_payload")]
+        if hubspot_payloads:
+            # combined = self.hubspot_client.add_companies(hubspot_payloads)
+            for payload in hubspot_payloads:
+                if payload["domain"] != "alliedtime.com":
+                    continue
+
+                payload["properties"]["apollo_industry_fixed"] = payload["properties"][
+                    "apollo_industry"
+                ]
+                del payload["properties"]["apollo_industry"]
+                result = self.hubspot_client.add_company(payload)
+                if not result["success"]:
+                    logger.error(f"HubSpot batch error: {result['error']}")
+
+            # for err in combined_results.get("errors", []):
+            #     logger.error(f"HubSpot batch error: {err}")
+
+        # 2. Good Sheet (Successes)
+        if processed:
+            rows = [
+                self._build_success_row(p["domain"], p.get("data", {}), scrape_date_str)
+                for p in processed
+            ]
+            self.good_sheet.append_rows(rows, value_input_option="USER_ENTERED", table_range="A1")
+            time.sleep(0.5)
+
+        # 3. Error Sheet (Errors)
+        if failed:
+            rows = [[p["domain"], p.get("error", "Unknown Error"), scrape_date_str] for p in failed]
+            self.error_sheet.append_rows(rows, value_input_option="USER_ENTERED", table_range="A1")
+            time.sleep(0.5)
+
+    def save_skipped_results(self, skipped_domains: list[str]):
+        scrape_date_str = datetime.datetime.now().strftime("%m-%d-%Y")
+        if skipped_domains:
+            rows = [[domain, scrape_date_str] for domain in skipped_domains]
+            self.skip_sheet.append_rows(rows, value_input_option="USER_ENTERED", table_range="A1")
+            time.sleep(0.5)
+
+    def _build_success_row(self, domain: str, data: dict, scrape_date: str) -> list:
+        apollo = data.get("apollo_result", {})
+        seamless = data.get("seamless_result", {})
+        return [
+            domain,
+            domain,
+            domain,
+            data.get("hq_phone_no", ""),
+            data.get("website_availability", ""),
+            data.get("hq_address_listed", ""),
+            data.get("b2c_sales", ""),
+            data.get("b2b_sales", ""),
+            data.get("industry_classification", ""),
+            data.get("ecommerce_platform", ""),
+            data.get("lead_status", ""),
+            data.get("revenue", ""),
+            data.get("shipping_messaging", ""),
+            data.get("shipping_methods", ""),
+            data.get("carriers", ""),
+            data.get("product_size_weight", ""),
+            data.get("smallest_product_dim", ""),
+            data.get("smallest_product_cubic_size", ""),
+            data.get("smallest_product_name", ""),
+            data.get("largest_product_dim", ""),
+            data.get("largest_product_cubic_size", ""),
+            data.get("largest_product_name", ""),
+            data.get("redirected_to", ""),
+            *apollo.values(),
+            *seamless.values(),
+            scrape_date,
+        ]
+
+    def on_complete(self, records: list[DomainInput], job_id: str = None) -> None:
+        # 1. Delete rows from input sheet
         row_numbers = sorted([r.row_no for r in records], reverse=True)
         logger.info(f"Total rows to delete: {len(row_numbers)}")
         for row_no in row_numbers:
             self.input_sheet.delete_rows(row_no)
+            time.sleep(0.5)
+
+    def build_response(self, job_id: str) -> dict:
+        seen_records, unseen_records = self.get_records()
+        CHUNK_SIZE = int(os.getenv("CHUNK_SIZE", "5"))
+        chunks = []
+        for i in range(0, len(unseen_records), CHUNK_SIZE):
+            chunk_records = unseen_records[i : i + CHUNK_SIZE]
+            chunks.append(
+                {
+                    "chunk_id": i // CHUNK_SIZE,
+                    "domains": [
+                        {"domain": r.company_url, "row_no": r.row_no} for r in chunk_records
+                    ],
+                    "workflow_mode": "production",
+                    "job_id": job_id,
+                }
+            )
+        logger.info(
+            f"Split {len(unseen_records)} records into {len(chunks)} chunks "
+            f"(job_id={job_id}, skipped={len(seen_records)})"
+        )
+        return {
+            "workflow_mode": "production",
+            "job_id": job_id,
+            "chunks": chunks,
+            "skipped_records": seen_records,
+        }
 
     def _append(
         self,
@@ -315,6 +521,7 @@ class ProductionSheetStrategy(BaseSheetStrategy):
             sheet.append_row([domain_input.company_url, scrape_date_str], table_range="A1")
         else:
             logger.error(f"Invalid scrape status or missing output for {domain_input.company_url}")
+        time.sleep(0.5)
 
     def _load_history_domains(self) -> set[str]:
         info = self.handler.spreadsheet_info
@@ -362,7 +569,7 @@ class HubSpotDataMapper:
                 "scraper_carriers": get_str(output.carriers),
                 "scraper_product_size": get_str(output.product_size_weight),
                 "hs_redirect_domain": get_str(output.redirected_to),
-                "apollo_industry": get_str(output.apollo_result.industry),
+                "apollo_industry_fixed": get_str(output.apollo_result.industry),
                 "hq_phone_number_apollo": get_str(output.apollo_result.company_phone),
                 "apollo___of_retail_locations": get_str(output.apollo_result.company_state),
                 "apollo_annual_revenue_number_fix_use_this": get_str(

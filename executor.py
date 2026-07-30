@@ -2,7 +2,7 @@ import os
 import re
 import time
 from dataclasses import asdict, dataclass
-from typing import Any, Optional
+from typing import Optional
 
 import tldextract
 from yarl import URL
@@ -44,22 +44,29 @@ class MainExecutor:
         self.bot_scraper = BotScraper(s3_bucket_name=bucket_name)
         self.apollo_api = ApolloAPI()
         self.seamless_api = SeamlessAPI()
-        self.apollo_results: dict[str, ApolloResult] = {}
-        self.seamless_results: dict[str, SeamlessResult] = {}
 
     def run(self) -> None:
         records = self.strategy.get_records()
+        apollo_results = {}
+        seamless_results = {}
         if self.strategy.pre_enrich:
             domains = [record.company_url for record in records]
-            self.apollo_results = self.apollo_api.enrich_leads(domains)
-            self.seamless_results = self.seamless_api.enrich_leads(domains)
+            apollo_results = self.apollo_api.enrich_leads(domains)
+            seamless_results = self.seamless_api.enrich_leads(domains)
         for record in records:
-            if self.strategy.check_seen and self.strategy.is_seen(record):
-                self.strategy.on_skip(record)
-                continue
+            # if self.strategy.check_seen and self.strategy.is_seen(record):
+            #     self.strategy.on_skip(record)
+            #     continue
             try:
                 output = self._process_record(record)
                 if output:
+                    if self.strategy.pre_enrich:
+                        output.apollo_result = apollo_results.get(
+                            record.company_url, ApolloResult()
+                        )
+                        output.seamless_result = seamless_results.get(
+                            record.company_url, SeamlessResult()
+                        )
                     self.strategy.on_success(record, output)
             except Exception:
                 logger.exception(
@@ -85,7 +92,7 @@ class MainExecutor:
             seamless_result=SeamlessResult(),
         )
 
-    def _process_record(self, record: DomainInput) -> Optional[DomainResponse]:
+    def _process_record(self, record: DomainInput) -> tuple[str, DomainResponse]:
         """Process a single record and return the summary, or None on failure."""
         default_summary = self._get_default_summary()
 
@@ -102,14 +109,15 @@ class MainExecutor:
 
         if not result.body:
             logger.error(f"Unable to scrape url={record.company_url}. Returning default summary.")
-            self.strategy.on_error(record, default_summary)
-            return None
+            # self.strategy.on_error(record, default_summary)
+            return "error", default_summary
 
         if result.is_blocked:
             logger.error(f"url={record.company_url} has been blocked. Returning default summary.")
             default_summary.lead_status = "Unqualified - Website Blocked"
-            self.strategy.on_error(record, default_summary)
-            return None
+            # self.strategy.on_error(record, default_summary)
+            return "error", default_summary
+            # return None
 
         website_url = self._determine_website_url(record.company_url, result.domain_url)
         redirected_to: Optional[str] = None
@@ -130,8 +138,9 @@ class MainExecutor:
             )
             if not final_summary_json:
                 default_summary.lead_status = "Error: LLM Failed"
-            self.strategy.on_error(record, default_summary)
-            return None
+            # self.strategy.on_error(record, default_summary)
+            return "error", default_summary
+            # return None
 
         about_contact_summary_json: Optional[DomainResponse] = None
         if self._needs_additional_scraping(final_summary_json):
@@ -139,7 +148,7 @@ class MainExecutor:
                 record, links, website_url, final_summary_json
             )
 
-        revenue = self.fetch_revenue(company_url=website_url)
+        revenue = None  # self.fetch_revenue(company_url=website_url)
         merged_summary = self.merge_summary_outputs(
             final_summary_json, about_contact_summary_json, revenue
         )
@@ -151,19 +160,8 @@ class MainExecutor:
         if redirected_to:
             merged_summary.redirected_to = redirected_to
 
-        if self.strategy.pre_enrich:
-            if redirected_to:
-                redirected_to_domain = re.sub(r"http(s)?://(www\.)?", "", website_url)
-                apollo_result = self.apollo_api.enrich_leads([redirected_to_domain])
-                seamless_result = self.seamless_api.enrich_leads([redirected_to_domain])
-                merged_summary.apollo_result = apollo_result[redirected_to_domain]
-                merged_summary.seamless_result = seamless_result[redirected_to_domain]
-            else:
-                merged_summary.apollo_result = self.apollo_results[record.company_url]
-                merged_summary.seamless_result = self.seamless_results[record.company_url]
-
         logger.info(f"Summary extracted against url={website_url}.")
-        return merged_summary
+        return "success", merged_summary
 
     def fetch_revenue(self, company_url: str) -> Optional[float]:
         base_url = URL("https://www.google.com/search")
@@ -325,8 +323,26 @@ class MainExecutor:
 
         return DomainResponse(**final_summary)
 
-    def process_single_record(self, record: DomainInput) -> Optional[DomainResponse]:
-        return self._process_record(record)
+    def process_domain(
+        self,
+        domain_url: str,
+        apollo_result: Optional[ApolloResult] = None,
+        seamless_result: Optional[SeamlessResult] = None,
+    ) -> tuple[str, DomainResponse]:
+        """Process a single domain URL without strategy side effects."""
+        record = DomainInput(row_no=0, company_url=domain_url)
+        mode, result = self._process_record(record)
+        if mode == "success" and self.strategy.pre_enrich:
+            if result.redirected_to:
+                redirected_to_domain = re.sub(r"http(s)?://(www\.)?", "", result.redirected_to)
+                apollo_result = self.apollo_api.enrich_leads([redirected_to_domain])
+                seamless_result = self.seamless_api.enrich_leads([redirected_to_domain])
+                result.apollo_result = apollo_result.get(redirected_to_domain, ApolloResult())
+                result.seamless_result = seamless_result.get(redirected_to_domain, SeamlessResult())
+            else:
+                result.apollo_result = apollo_result
+                result.seamless_result = seamless_result
+        return mode, result
 
     def compute_lead_status(
         self, homepage_summary: DomainResponse, other_summary: Optional[DomainResponse]
@@ -355,13 +371,6 @@ class MainExecutor:
             other_summary is not None and other_summary.b2b_sales == "Yes"
         )
         if not b2c and not b2b:
-            return "Unqualified - Junk Lead / No Shipping"
+            return "Unqualified – Junk Lead / No Shipping"
 
         return "Lift Prime"
-
-
-def lambda_handler(event: Any, context: Any) -> None:
-    """AWS Lambda handler. Set WORKFLOW_MODE env var to 'production' or 'regular' (default)."""
-    workflow_mode = os.environ.get("WORKFLOW_MODE", "regular")
-    main_executor = MainExecutor(workflow_mode=workflow_mode)
-    main_executor.run()

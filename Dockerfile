@@ -76,5 +76,8 @@ COPY executor.py executor.py
 COPY logger.py logger.py
 COPY config.py config.py
 COPY credentials.json credentials.json
+COPY lambdas ./lambdas
+COPY main.py main.py
+COPY response.json response.json
 
 ENTRYPOINT ["python", "-m", "awslambdaric" ]

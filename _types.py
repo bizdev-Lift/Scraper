@@ -12,6 +12,8 @@ class GoogleSheetInfo:
     good_results_sheet: str | None = None
     skip_results_sheet: str | None = None
     error_results_sheet: str | None = None
+    single_spreadsheet_id: str | None = None
+    single_sheet_name: str | None = None
 
 
 @dataclass
