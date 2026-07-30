@@ -77,7 +77,7 @@
 **Question:** Does the website sell physical products directly to consumers?
 
 **Look for visible indicators:**
-- **EXPLICIT** 
+- **EXPLICIT**
     - "Add to Cart" or "Buy Now" or "View Cart" buttons or "Cart" icons *associated with specific valid product listings.*  The button must directly add the product to a shopping cart or initiate a clear purchase process. If this button or icon is not present then b2c_sales set to No. The button can have some other type of text as well like "Add to Basket", "Purchase", "Shop Now" etc.
     - The following visible text phrases also qualify as cart indicators when at least one product with a visible price exists on the same page: "Your Cart", "My Cart", "View Cart", "Shopping Cart"
     - Cart icon elements also qualify when atleast one of the THREE of the following are true: (1) the element's class attribute contains any of: `nav-btn-sm_cart`, `nav-btn-icon`, `icon-cart`, `header-cart`, `cart-code`, `cart-link`, `cart-icon`, `cart-trigger`, `cart-toggle`, `mini-cart`, `minicart`, `js-cart`, `cart-btn`, `cart-button`, `cart-widget` and if it has text inside that says `Cart` (2) the element's href attribute contains the word "cart" anywhere (e.g. `/cart`, `/my-cart`, `/shopping-cart`, `/cart/view`, `/checkout/cart`) — this applies to BOTH relative URLs (e.g. /cart, /my-cart, /shopping-cart) AND absolute URLs (e.g. https://www.example.com/cart/, https://store.example.com/my-cart) (3) at least one product with a visible price exists on the page or if price doesn't exists then categories/groups of products should exist.
@@ -175,44 +175,44 @@ Only if at least one keyword is FOUND, continue to the verification steps below.
 
 ### 6. Industry Classification (json_key: industry_classification)
 **Question:** What industry best describes this company based on visible content?
- 
+
 **Available Classifications — check ALL signals listed before selecting:**
 
 - **Apparel:** Clothing categories (Men/Women/Kids/Unisex), seasonal collections, fashion photography, size guides, fabric descriptions, style names. Includes activewear, swimwear, outerwear, footwear, hats, gloves, socks, scarves. Also includes fiber/yarn products sold as clothing material (e.g. alpaca fiber clothing, wool garments).
   - *Signals:* size selectors (S/M/L/XL), "shop by gender", "new arrivals", "lookbook", clothing category names in nav menus
- 
+
 - **Sporting Goods Or Outdoor:** Gear for sports or outdoor activities — bikes, fishing, hunting, archery, camping, hiking, fitness, skiing, water sports. Performance and activity-focused language.
   - *Signals:* sport/activity names in nav, gear specs, "performance", "trail", "competition", weight/durability specs, sport-specific accessories
- 
+
 - **Auto Parts:** Car, truck, motorcycle, ATV, or powersport parts and accessories. Includes tires, wheels, exhaust, engine parts, body kits.
   - *Signals:* vehicle year/make/model filters, "aftermarket", "OEM", "fitment", part numbers, vehicle-specific category names
- 
+
 - **Home Goods:** Items used in the home — kitchenware, cookware, bedding, bath, décor, candles, storage, cleaning supplies. Does NOT include full furniture items (those are Bad Product Type).
   - *Signals:* room names in categories (kitchen, bath, bedroom), "home décor", "interior", product descriptions mentioning home use
- 
+
 - **Food and Beverage:** Consumable food or drink products. Includes specialty foods, supplements, coffee, tea, snacks.
   - *Signals:* ingredients lists, nutritional info, dietary labels (vegan, gluten-free, organic), flavor descriptions, "shop by diet", expiry dates, food photography
- 
+
 - **Industrial or Manufacturing:** B2B-oriented heavy equipment, raw materials, industrial tools, safety equipment, custom fabrication, OEM components, wholesale supplies.
   - *Signals:* industrial certifications (ISO, OSHA), "bulk order", "lead time", "custom fabrication", spec sheets, material grades, engineering language
- 
+
 - **Electronics:** Consumer or commercial electronic devices, components, and accessories — gadgets, chargers, cables, circuit boards, audio/video equipment, smart devices.
   - *Signals:* tech specs (voltage, wattage, MHz, GB), compatibility lists, "plug and play", connector types
- 
+
 - **Cosmetics:** Skincare, makeup, haircare, fragrance, personal care products.
   - *Signals:* "cruelty-free", "vegan", "organic", "dermatologist tested", skin type mentions, ingredient lists, SPF ratings, beauty photography
- 
+
 - **Medical:** Medical devices, clinical equipment, patient care tools, pharmaceutical products, healthcare supplies.
   - *Signals:* FDA clearance/approval mentions, HIPAA language, clinical terminology, device classification numbers, "sterile", prescription-only language
- 
+
 - **Other:** Use ONLY when you have clearly identified the industry but it does not match ANY of the categories above. Examples: jewelry, pet supplies, toys, office supplies, arts & crafts, books, musical instruments, software, pure service businesses. Do NOT use "Other" as a fallback when uncertain — use "NA" for uncertainty instead.
- 
+
 - **Mixed:** Use when the site clearly and equally sells products from TWO OR MORE of the listed industry categories above. Both categories must be identifiable from primary navigation, hero content, or product listings — not just a minor secondary offering.
   - Example: A site selling both motorcycle parts AND motorcycle apparel → **Mixed**
-  - Example: A site selling both fitness equipment AND supplements → **Mixed** 
+  - Example: A site selling both fitness equipment AND supplements → **Mixed**
   - Example: A site primarily selling clothing with one accessories section → **Apparel**
   - Rule: If one category accounts for more than ~70% of visible products/nav items, pick that single category instead of Mixed.
- 
+
 **Disambiguation rules (common confusions):**
 - Alpaca fiber products / wool / yarn sold as clothing or worn as garments → **Apparel**
 - Rugs, carpets, flooring → **Home Goods**
@@ -222,7 +222,7 @@ Only if at least one keyword is FOUND, continue to the verification steps below.
 - Fitness trackers/smartwatches → **Electronics** (not Sporting Goods Or Outdoor)
 - Jewelry, watches (non-smart), handbags → **Other**
 - Pet products → **Other**
- 
+
 **Selection Criteria — decision order (follow this sequence):**
 1. Identify all product/service categories visible on the page
 2. For each identified category, find the CLOSEST SEMANTIC MATCH from the available classifications. Do not require exact wording — use the meaning, not the label. Use the semantic mapping table below.
@@ -231,13 +231,13 @@ Only if at least one keyword is FOUND, continue to the verification steps below.
 5. If the industry is clearly identifiable but still has NO semantic match in the list after checking the table → return **Other**
 6. If evidence is genuinely insufficient to identify the industry → return **NA**
 7. The returned value should be equal to the alllowed values above. We don't want **Mixed (cosmetics + food and beverage)**. We need only **Mixed** in this case.
- 
+
 ⛔ Do NOT use "Other" when you are uncertain — "Other" means "I identified the industry but it genuinely has no match in the list." Uncertainty = "NA".
 ⛔ Do NOT use "Other" or "NA" when a semantic match exists in the table below — always map to the closest listed category first.
 ⛔ Do NOT use "Mixed" for a dominant category with minor secondary products — use Mixed only when two or more listed categories have roughly equal weight on the page.
- 
+
 **Semantic mapping table — map what you see on the page to the correct classification:**
- 
+
 | What you identified on the page | Correct classification |
 |---|---|
 | Automotive, Cars, Vehicles, Trucks, Auto accessories | **Auto Parts** |
@@ -498,7 +498,7 @@ Miva Merchant, Web Shop Manager, Cart Functionality, Ecwid, Squarespace, Wix, Sm
 **Question:** Based on visible product descriptions and page content, what best describes the size and weight profile of the products sold?
 
 **Classification rules — pick the BEST match from visible content:**
- 
+
 - **Lightweight / Standard** — everyday consumer products with no size or weight callouts. Examples: clothing, accessories, small electronics, cosmetics, books, small home goods
 - **Heavy / Bulky** — explicit mentions of heavy, oversized, or large format products. Look for: "heavy duty", "oversized", "large format", "bulky", product weights listed in lbs/kg suggesting heavy items, large dimensions mentioned
 - **Industrial / Wholesale** — commercial grade or industrial scale products. Look for: "industrial", "commercial grade", "bulk quantities", "wholesale", machinery, heavy equipment, raw materials
@@ -634,4 +634,3 @@ If `lead_status` is "Unqualified – Junk Lead / No Shipping" but top-level `b2c
 - [ ] Format matches requirements exactly
 - [ ] No null/None values returned
 - [ ] Estimated Packaging Sizes only contains text literally visible/legible in the provided images — no estimation based on visual size comparison
-

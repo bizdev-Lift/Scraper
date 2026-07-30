@@ -1,11 +1,11 @@
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
-from typing import Literal
-import uvicorn
 from contextlib import asynccontextmanager
 
-from executor import MainExecutor
+import uvicorn
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+
 from _types import DomainInput, DomainResponse
+from executor import MainExecutor
 from logger import logger
 
 
@@ -79,8 +79,7 @@ async def process_company(request: ProcessRequest):
         logger.info(f"API request received for url: {request.domain_url}")
 
         # Process the record
-        default_summary_json = executor._get_default_summary()
-        result = executor.process_record(domain_input, default_summary_json)
+        result = executor.process_single_record(domain_input)
 
         logger.info(f"Successfully processed company: {request.domain_url}")
         return result
@@ -91,6 +90,4 @@ async def process_company(request: ProcessRequest):
 
 
 if __name__ == "__main__":
-    uvicorn.run(
-        "api_server:app", host="0.0.0.0", port=8000, reload=True, log_level="info"
-    )
+    uvicorn.run("api_server:app", host="0.0.0.0", port=8000, reload=True, log_level="info")

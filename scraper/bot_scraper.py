@@ -1,19 +1,18 @@
+import random
 import re
 import time
-import tldextract
+from typing import List, Optional, Tuple
 
-import random
-from typing import List, Tuple, Optional
-from yarl import URL
-from logger import logger
-from playwright.sync_api import sync_playwright, Browser, BrowserContext, Page
+import tldextract
 from lxml.etree import tostring
+from playwright.sync_api import Browser, BrowserContext, Page, sync_playwright
+from yarl import URL
+
+from io_operations.s3_client import S3Client
+from logger import logger
+from scraper._types import PageRequest, PageResponse, ParsedResponse
 from scraper.block_detector import ScrapeBlockDetector
 from scraper.parser import load_tree, parser
-from scraper._types import PageResponse, ParsedResponse, PageRequest
-from io_operations.s3_client import S3Client
-
-# from playwright_stealth import Stealth
 
 
 class BotScraper:
@@ -53,9 +52,7 @@ class BotScraper:
             domain_url: Optional[str] = None
             page = self._setup_page(browser)
         except Exception as e:
-            logger.exception(
-                f"Exception while creating browser or context. Exception is: {e}"
-            )
+            logger.exception(f"Exception while creating browser or context. Exception is: {e}")
             return [], None
 
         page_responses: List[ParsedResponse] = []
@@ -86,27 +83,6 @@ class BotScraper:
 
     def _create_browser(self) -> Browser:
         """Create and configure browser instance."""
-        # return self.playwright.chromium.launch(
-        #     headless=True,
-        #     args=[
-        #         # "--no-sandbox",
-        #         # "--disable-gpu",
-        #         "--no-sandbox",
-        #         "--disable-setuid-sandbox",
-        #         "--disable-dev-shm-usage",
-        #         "--disable-accelerated-2d-canvas",
-        #         "--disable-gpu",
-        #         # "--single-process",
-        #         "--no-zygote",
-        #         "--disable-audio-output",
-        #         "--disable-software-rasterizer",
-        #         "--disable-webgl",
-        #         "--disable-web-security",
-        #         "--disable-features=LazyFrameLoading",
-        #         "--disable-features=IsolateOrigins",
-        #         "--disable-background-networking",
-        #     ],
-        # )
         return self.playwright.chromium.launch(
             headless=True,
             args=[
@@ -124,8 +100,6 @@ class BotScraper:
     def _setup_page(self, browser: Browser) -> Page:
         """Setup page with stealth configuration."""
         page = browser.new_page()
-        # stealth = Stealth()
-        # stealth.apply_stealth_sync(page)
         return page
 
     def _scrape_single_page(self, page: Page, page_request: PageRequest) -> tuple[str | None, dict]:
@@ -151,10 +125,7 @@ class BotScraper:
                 )
             return page_content, blocked_status
         except Exception as e:
-            logger.error(
-                f"Exception while loading page content for url={url}. "
-                f"Exception is: {e}"
-            )
+            logger.error(f"Exception while loading page content for url={url}. Exception is: {e}")
 
         return page_content, blocked_status
 
