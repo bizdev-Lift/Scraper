@@ -9,9 +9,9 @@ Tags to remove
 """
 
 from clear_html.formatted_text.cleaner import BodyCleaner
-from lxml.html import HTMLParser, HtmlElement, fromstring
-from scraper._types import PageResponse
+from lxml.html import HtmlElement, HTMLParser, fromstring
 
+from scraper._types import PageResponse
 
 cleaner = BodyCleaner(
     scripts=False,

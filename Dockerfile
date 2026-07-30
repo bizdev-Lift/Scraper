@@ -47,7 +47,7 @@ RUN python -m pip install --upgrade pip \
    GOOGLE_APPLICATION_CREDENTIALS=/var/run/secrets/google/gcp_credentials.json \
    uv sync  \
    --no-install-project # Similar to --no-root in poetry \
-   --frozen # Sync without updating the lock file 
+   --frozen # Sync without updating the lock file
 
 ENV PATH="$APP_PATH/.venv/bin:$PATH"
 ENV VIRTUAL_ENV="$APP_PATH/.venv"

@@ -1,21 +1,33 @@
-import time
 import os
 import re
-from typing import Any, Optional, Tuple
+import time
+from dataclasses import asdict, dataclass
+from typing import Any, Optional
 
 import tldextract
+from yarl import URL
 
+from _types import ApolloResult, DomainInput, DomainResponse, SeamlessResult
 from apollo.companies_search import ApolloAPI
-from seamless.companies_search import SeamlessAPI
-from io_operations.google_sheets import GoogleSheetsHandler, RegularSheetStrategy, ProductionSheetStrategy
-from _types import DomainResponse, DomainInput, ApolloResult, SeamlessResult
-from scraper.generic_scraper import GenericScraper
-from scraper._types import PageRequest
+from config import settings
+from io_operations.google_sheets import (
+    GoogleSheetsHandler,
+    ProductionSheetStrategy,
+    RegularSheetStrategy,
+)
 from llm.llm_helpers import LLMHelper
 from logger import logger
+from scraper._types import PageRequest
 from scraper.bot_scraper import BotScraper
-from config import settings
-from yarl import URL
+from scraper.generic_scraper import GenericScraper
+from seamless.companies_search import SeamlessAPI
+
+
+@dataclass
+class ScrapeResult:
+    body: Optional[str]
+    domain_url: Optional[str]
+    is_blocked: bool
 
 
 class MainExecutor:
@@ -32,26 +44,27 @@ class MainExecutor:
         self.bot_scraper = BotScraper(s3_bucket_name=bucket_name)
         self.apollo_api = ApolloAPI()
         self.seamless_api = SeamlessAPI()
-        self.apollo_results = []
-        self.seamless_results = []
+        self.apollo_results: dict[str, ApolloResult] = {}
+        self.seamless_results: dict[str, SeamlessResult] = {}
 
     def run(self) -> None:
         records = self.strategy.get_records()
-        if isinstance(self.strategy, ProductionSheetStrategy):
+        if self.strategy.pre_enrich:
             domains = [record.company_url for record in records]
             self.apollo_results = self.apollo_api.enrich_leads(domains)
             self.seamless_results = self.seamless_api.enrich_leads(domains)
         for record in records:
-            if (
-                isinstance(self.strategy, ProductionSheetStrategy)
-                and self.strategy.is_seen(record)
-            ):
+            if self.strategy.check_seen and self.strategy.is_seen(record):
                 self.strategy.on_skip(record)
                 continue
-
-            output = self._process_record(record)
-            if output:
-                self.strategy.on_success(record, output)
+            try:
+                output = self._process_record(record)
+                if output:
+                    self.strategy.on_success(record, output)
+            except Exception:
+                logger.exception(
+                    f"Error while parsing domain {record.company_url}. Please visit it again."
+                )
 
             time.sleep(10)
 
@@ -69,7 +82,7 @@ class MainExecutor:
             ecommerce_platform="N/A",
             lead_status="Unqualified - Website Down",
             apollo_result=ApolloResult(),
-            seamless_result=SeamlessResult()
+            seamless_result=SeamlessResult(),
         )
 
     def _process_record(self, record: DomainInput) -> Optional[DomainResponse]:
@@ -84,35 +97,37 @@ class MainExecutor:
             PageRequest(url=f"https://{record.company_url}"),
             PageRequest(url=f"https://www.{record.company_url}"),
         ]
-        parsed_response, domain_url, is_blocked = self.process(
-            record, page_requests, get_first_successful_response=True, page_name="Homepage"
-        )
-        domain_url = domain_url.rstrip("/") if domain_url else domain_url
+        result = self.process(page_requests, get_first_successful_response=True)
+        domain_url = result.domain_url.rstrip("/") if result.domain_url else result.domain_url
 
-        if not parsed_response:
+        if not result.body:
             logger.error(f"Unable to scrape url={record.company_url}. Returning default summary.")
             self.strategy.on_error(record, default_summary)
             return None
 
-        if is_blocked:
+        if result.is_blocked:
             logger.error(f"url={record.company_url} has been blocked. Returning default summary.")
             default_summary.lead_status = "Unqualified - Website Blocked"
             self.strategy.on_error(record, default_summary)
             return None
 
-        website_url = self._determine_website_url(record.company_url, domain_url)
+        website_url = self._determine_website_url(record.company_url, result.domain_url)
         redirected_to: Optional[str] = None
         if not website_url:
             logger.error(
-                f"The website {record.company_url} redirected to another domain. Treating as wrong domain."
+                f"The website {record.company_url} redirected to "
+                "another domain. Treating as wrong domain."
             )
-            website_url = domain_url
+            website_url = result.domain_url
             redirected_to = domain_url
 
-        final_summary_json, links = self.llm_helper.process(website_url, parsed_response)
+        final_summary_json, links = self.llm_helper.process(website_url, result.body)
 
         if not final_summary_json or final_summary_json.website_availability == "No":
-            logger.error(f"Unable to extract summary for url={record.company_url}. Returning default summary.")
+            logger.error(
+                f"Unable to extract summary for url={record.company_url}. "
+                "Returning default summary."
+            )
             if not final_summary_json:
                 default_summary.lead_status = "Error: LLM Failed"
             self.strategy.on_error(record, default_summary)
@@ -129,14 +144,14 @@ class MainExecutor:
             final_summary_json, about_contact_summary_json, revenue
         )
 
-        if isinstance(self.strategy, RegularSheetStrategy):
+        if self.strategy.track_old_lead_status:
             if isinstance(record.old_lead_status, str) and "LLM Failed" in record.old_lead_status:
                 merged_summary.old_lead_status = record.old_lead_status
 
         if redirected_to:
             merged_summary.redirected_to = redirected_to
 
-        if isinstance(self.strategy, ProductionSheetStrategy):
+        if self.strategy.pre_enrich:
             if redirected_to:
                 redirected_to_domain = re.sub(r"http(s)?://(www\.)?", "", website_url)
                 apollo_result = self.apollo_api.enrich_leads([redirected_to_domain])
@@ -191,42 +206,31 @@ class MainExecutor:
         initial_summary: DomainResponse,
     ) -> DomainResponse:
         """Scrape additional pages (about us, contact us) for missing information."""
-        logger.info(
-            "Some attributes missing from homepage — scraping about/contact pages."
-        )
+        logger.info("Some attributes missing from homepage — scraping about/contact pages.")
 
         if not links:
             logger.warning(f"No links extracted from homepage for url={website_url}.")
             return initial_summary
 
         page_requests = self._build_page_requests(links, website_url)
-        parsed_response, _, _ = self.process(record, page_requests)
-        if not parsed_response:
-            logger.error(
-                f"Unable to scrape about/contact page for url={website_url}. Skipping."
-            )
+        result = self.process(page_requests)
+        if not result.body or result.is_blocked:
+            logger.error(f"Unable to scrape about/contact page for url={website_url}. Skipping.")
             return initial_summary
 
         about_contact_summary_json, _ = self.llm_helper.process(
             website_url,
-            parsed_response,
+            result.body,
             page_name="About Us, Contact Us",
         )
 
         return about_contact_summary_json
 
-    def _build_page_requests(
-        self, links: list[str], website_url: str
-    ) -> list[PageRequest]:
+    def _build_page_requests(self, links: list[str], website_url: str) -> list[PageRequest]:
         """Build page requests from extracted links."""
-        return [
-            PageRequest(url=self._build_full_url(link, website_url))
-            for link in links
-        ]
+        return [PageRequest(url=self._build_full_url(link, website_url)) for link in links]
 
-    def _determine_website_url(
-        self, company_url: str, domain_url: Optional[str]
-    ) -> Optional[str]:
+    def _determine_website_url(self, company_url: str, domain_url: Optional[str]) -> Optional[str]:
         """Determine the base website URL; returns None if domain has changed."""
         if not domain_url:
             return company_url
@@ -250,14 +254,15 @@ class MainExecutor:
 
     def process(
         self,
-        record: DomainInput,
         page_requests: list[PageRequest],
         use_bot: bool = False,
         retry: bool = True,
         get_first_successful_response: bool = False,
-        page_name: str | None = None
-    ) -> Tuple[Optional[str], Optional[str], bool]:
-        # if page_name == "Homepage" or use_bot:
+        _depth: int = 0,
+    ) -> ScrapeResult:
+        if _depth > 1:
+            return ScrapeResult(body=None, domain_url=None, is_blocked=False)
+
         if use_bot:
             self.bot_scraper.start()
             parsed_responses, domain_url = self.bot_scraper.run(
@@ -273,46 +278,45 @@ class MainExecutor:
             )
             if not parsed_responses:
                 return self.process(
-                    record,
                     page_requests,
                     use_bot=True,
                     get_first_successful_response=get_first_successful_response,
+                    _depth=_depth + 1,
                 )
 
         bodies = [r.body for r in parsed_responses]
         is_blocked = all(r.is_blocked for r in parsed_responses)
-
-        return "\n".join(bodies), domain_url, is_blocked
+        return ScrapeResult(body="\n".join(bodies), domain_url=domain_url, is_blocked=is_blocked)
 
     def merge_summary_outputs(
         self,
-        summary_json1: DomainResponse,
-        summary_json2: Optional[DomainResponse],
+        summary1: DomainResponse,
+        summary2: Optional[DomainResponse],
         revenue: Optional[float],
     ) -> DomainResponse:
-        if not summary_json2:
+        if not summary2:
             if revenue:
-                summary_json1.revenue = revenue
-
-            summary_json1.lead_status = self.compute_lead_status(summary_json1, summary_json2)
-            return summary_json1
+                summary1.revenue = revenue
+            summary1.lead_status = self.compute_lead_status(summary1, summary2)
+            return summary1
 
         final_summary = {}
-        summary_json2_dict = summary_json2.__dict__
+        fields1 = asdict(summary1)
+        fields2 = asdict(summary2)
 
-        for key, value in summary_json1.__dict__.items():
+        for key, value in fields1.items():
             if value in ["No", "", "N/A"]:
-                final_summary[key] = summary_json2_dict[key]
+                final_summary[key] = fields2[key]
             elif key == "hq_phone_no" and "@" in value:
-                final_summary[key] = summary_json2_dict[key]
+                final_summary[key] = fields2[key]
             elif (
                 key == "industry_classification"
                 and value == "Other"
-                and summary_json2_dict[key] not in ["N/A", "Other"]
+                and fields2[key] not in ["N/A", "Other"]
             ):
-                final_summary[key] = summary_json2_dict[key]
+                final_summary[key] = fields2[key]
             elif key == "lead_status":
-                final_summary["lead_status"] = self.compute_lead_status(summary_json1, summary_json2)
+                final_summary["lead_status"] = self.compute_lead_status(summary1, summary2)
             else:
                 final_summary[key] = value
 
@@ -321,7 +325,12 @@ class MainExecutor:
 
         return DomainResponse(**final_summary)
 
-    def compute_lead_status(self, homepage_summary: DomainResponse, other_summary: Optional[DomainResponse]) -> str:
+    def process_single_record(self, record: DomainInput) -> Optional[DomainResponse]:
+        return self._process_record(record)
+
+    def compute_lead_status(
+        self, homepage_summary: DomainResponse, other_summary: Optional[DomainResponse]
+    ) -> str:
         """Compute lead status based on summary attributes."""
 
         if homepage_summary.website_availability in ["No", "N/A"]:

@@ -1,37 +1,65 @@
+import re
 from base64 import b64decode
 from concurrent.futures import ThreadPoolExecutor, as_completed
-import requests
-import re
+from typing import Final, Optional
 
+import requests
 import tldextract
+from fake_useragent import UserAgent
+from lxml.etree import tostring
 from yarl import URL
+
 from config import settings
+from io_operations.s3_client import S3Client
+from logger import logger
 from scraper._types import PageRequest, PageResponse, ParsedResponse
 from scraper.block_detector import ScrapeBlockDetector
 from scraper.parser import load_tree, parser
-from lxml.html import HtmlElement
-from lxml.etree import tostring, ParserError
-from fake_useragent import UserAgent
-from logger import logger
-from io_operations.s3_client import S3Client
+
+
+class ScraperError(Exception):
+    """Custom exception for scraping related errors."""
+
+    pass
 
 
 class GenericScraper:
-    HEADERS = {
+    DEFAULT_HEADERS: Final[dict[str, str]] = {
         "Content-Type": "application/json",
-        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X x.y; rv:42.0) Gecko/20100101 Firefox/42.0",
         "Accept": "*/*",
         "Connection": "keep-alive",
     }
 
-    def __init__(self, s3_bucket_name: str = None):
+    def __init__(self, s3_bucket_name: Optional[str] = None):
         self.ua = UserAgent()
         self.detector = ScrapeBlockDetector()
-        if s3_bucket_name:
-            self.s3_client = S3Client(bucket_name=s3_bucket_name)
-        else:
-            self.s3_client = None
-        pass
+        self.s3_client: Optional[S3Client] = (
+            S3Client(bucket_name=s3_bucket_name) if s3_bucket_name else None
+        )
+
+    def _prepare_request_args(self, url: str, use_proxy: bool, enable_browser_mode: bool) -> dict:
+        """Prepare arguments for request based on proxy/browser mode."""
+        headers = self.DEFAULT_HEADERS.copy()
+        headers["User-Agent"] = self.ua.chrome
+
+        if settings.zyte_enabled or use_proxy:
+            json_payload = {"url": url}
+            if enable_browser_mode:
+                json_payload["browserHtml"] = True
+            else:
+                json_payload.update({"httpResponseBody": True, "followRedirect": True})
+
+            return {
+                "url": settings.zyte_url,
+                "json": json_payload,
+                "auth": (settings.zyte_api_key, ""),
+                "headers": headers,
+            }
+
+        return {
+            "url": url,
+            "headers": headers,
+        }
 
     def get_request(
         self,
@@ -39,44 +67,24 @@ class GenericScraper:
         use_proxy: bool = False,
         enable_browser_mode: bool = False,
         retry: bool = False,
-        timeout: float | None = None,
-    ) -> requests.Response | None:
-        func_to_call = requests.get
-        timeout = timeout if timeout else settings.global_http_timeout
-        request_args = {
-            "url": url,
-            "timeout": timeout,
-            "headers": self.HEADERS,
-        }
-        if settings.zyte_enabled or use_proxy:
-            request_args["url"] = settings.zyte_url
-            request_args["json"] = {"url": url}
-            if enable_browser_mode:
-                request_args["json"]["browserHtml"] = True
-            else:
-                request_args["json"].update({
-                    "httpResponseBody": True,
-                    "followRedirect": True,
-                })
-            request_args["auth"] = (settings.zyte_api_key, "")
-            func_to_call = requests.post
+        timeout: Optional[float] = None,
+    ) -> Optional[requests.Response]:
+        """Fetch a single URL with retries."""
+        timeout = timeout or settings.global_http_timeout
+        request_args = self._prepare_request_args(url, use_proxy, enable_browser_mode)
+        request_args["timeout"] = timeout
 
-        retry_count = 3
-        while retry_count > 0:
+        func_to_call = requests.post if (settings.zyte_enabled or use_proxy) else requests.get
+
+        for attempt in range(3 if retry else 1):
             try:
-                request_args["headers"]["User-Agent"] = self.ua.chrome
                 response = func_to_call(**request_args)
-                assert response.status_code == 200
+                response.raise_for_status()
                 return response
-            except Exception:
-                logger.exception(
-                    f"Exception while fetching URL: {url} with timeout={timeout}. "
-                )
+            except requests.RequestException as e:
+                logger.warning(f"Attempt {attempt + 1} failed for {url}: {e}")
                 if not retry:
                     break
-
-                logger.info(f"Retrying to fetch URL: {url} with timeout={timeout}.")
-                retry_count -= 1
 
         return None
 
@@ -86,38 +94,42 @@ class GenericScraper:
         use_proxy: bool = False,
         enable_browser_mode: bool = False,
         retry: bool = False,
-        timeout: float | None = None,
+        timeout: Optional[float] = None,
         get_first_successful_response: bool = False,
-    ) -> tuple[list[PageResponse], str | None]:
+    ) -> tuple[list[PageResponse], Optional[str]]:
         page_responses: list[PageResponse] = []
-        domain_url: str | None = None
+        domain_url: Optional[str] = None
 
         with ThreadPoolExecutor(max_workers=5) as executor:
             future_to_urls = {
                 executor.submit(
                     self.get_request,
-                    request.url,
+                    req.url,
                     use_proxy,
                     enable_browser_mode,
                     retry,
                     timeout,
-                ): request.url
-                for request in page_requests
+                ): req.url
+                for req in page_requests
             }
+
             for future in as_completed(future_to_urls):
                 url = future_to_urls[future]
-                data: requests.Response = future.result()
-                if data:
-                    response, domain_url = self.extract_response(url, data, use_proxy)
-                    if "this site no longer supports insecure http" in response.content.lower():
-                        continue
+                try:
+                    data = future.result()
+                    if data:
+                        response, domain_url = self.extract_response(url, data, use_proxy)
+                        if "this site no longer supports insecure http" in response.content.lower():
+                            continue
 
-                    if get_first_successful_response:
-                        return [response], domain_url
-                else:
-                    response = PageResponse(content="", url=url)
-
-                page_responses.append(response)
+                        if get_first_successful_response:
+                            return [response], domain_url
+                        page_responses.append(response)
+                    else:
+                        page_responses.append(PageResponse(content="", url=url))
+                except Exception as e:
+                    logger.error(f"Error processing future for {url}: {e}")
+                    page_responses.append(PageResponse(content="", url=url))
 
         return page_responses, domain_url
 
@@ -143,16 +155,12 @@ class GenericScraper:
         use_proxy: bool = False,
         enable_browser_mode: bool = False,
         retry: bool = False,
-        timeout: float | None = None,
+        timeout: Optional[float] = None,
         get_first_successful_response: bool = False,
         save_to_s3: bool = True,
-    ):
-        """
-        - Get the HomePage and check if it has all the contents. If not, we cna get the about us and
-        """
+    ) -> tuple[list[ParsedResponse], Optional[str]]:
+        """Run scraping sequence: fetch, parse, and store."""
         parsed_responses: list[ParsedResponse] = []
-        page_responses: list[PageResponse]
-        domain_url: str | None = None
         page_responses, domain_url = self.fetch_htmls(
             page_requests,
             use_proxy,
@@ -161,51 +169,52 @@ class GenericScraper:
             timeout,
             get_first_successful_response,
         )
+
         for page_response in page_responses:
-            if page_response.content == "":
+            if not page_response.content:
                 continue
 
             blocked_status = self.detector.is_blocked(page_response.content)
-            url_host, url_path = self.get_url_components(page_response.url)
-            if self.s3_client and save_to_s3:
-                self.s3_client.write_raw_content(
-                    key=f"{url_host}/http-raw-{url_path}.html",
-                    content=page_response.content,
-                )
+            self._save_raw_to_s3(page_response, save_to_s3)
 
             try:
-                tree: HtmlElement = load_tree(page_response)
-            except ParserError:
+                tree = load_tree(page_response)
+                parser(tree)
+                response_body = re.sub(r"\n|\t", "", tostring(tree, encoding="unicode"))
+
+                self._save_parsed_to_s3(page_response, response_body, save_to_s3)
+
+                if len(response_body) < 1000 and not blocked_status["blocked"]:
+                    continue
+
                 parsed_responses.append(
                     ParsedResponse(
-                        body="",
+                        body=response_body,
                         url=page_response.url,
                         is_blocked=blocked_status["blocked"],
                     )
                 )
-                continue
-
-            parser(tree)
-            response_body = tostring(tree, encoding="unicode")
-            response_body = re.sub(r"\n|\t", "", response_body)
-            if self.s3_client and save_to_s3:
-                self.s3_client.write_raw_content(
-                    key=f"{url_host}/http-parsed-{url_path}.html",
-                    content=response_body,
+            except Exception as e:
+                logger.error(f"Failed to parse {page_response.url}: {e}")
+                parsed_responses.append(
+                    ParsedResponse(
+                        body="", url=page_response.url, is_blocked=blocked_status["blocked"]
+                    )
                 )
-
-            if len(response_body) < 1000 and not blocked_status["blocked"]:
-                continue
-
-            parsed_responses.append(
-                ParsedResponse(
-                    body=response_body,
-                    url=page_response.url,
-                    is_blocked=blocked_status["blocked"],
-                )
-            )
 
         return parsed_responses, domain_url
+
+    def _save_raw_to_s3(self, response: PageResponse, save_to_s3: bool) -> None:
+        if self.s3_client and save_to_s3:
+            host, path = self.get_url_components(response.url)
+            self.s3_client.write_raw_content(
+                key=f"{host}/http-raw-{path}.html", content=response.content
+            )
+
+    def _save_parsed_to_s3(self, response: PageResponse, content: str, save_to_s3: bool) -> None:
+        if self.s3_client and save_to_s3:
+            host, path = self.get_url_components(response.url)
+            self.s3_client.write_raw_content(key=f"{host}/http-parsed-{path}.html", content=content)
 
     def get_url_components(self, url: str) -> tuple[str, str]:
         url_host = tldextract.extract(url).top_domain_under_public_suffix

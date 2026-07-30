@@ -12,9 +12,6 @@ class GoogleSheetInfo:
     good_results_sheet: str | None = None
     skip_results_sheet: str | None = None
     error_results_sheet: str | None = None
-    history_good_results_sheet: str | None = None
-    history_skip_results_sheet: str | None = None
-    history_error_results_sheet: str | None = None
 
 
 @dataclass
@@ -71,10 +68,19 @@ class DomainResponse:
     revenue: float | None = None
     redirected_to: str | None = None
     old_lead_status: str | None = None
-    shipping_messaging: list[str] | None = None
+    shipping_messaging: str | None = None
     shipping_methods: str | None = None
-    carriers: list[str] | None = None
+    carriers: str | None = None
     product_size_weight: str | None = None
-    product_dimensions: str | None = None
+    # product_dimensions: str | None = None
+    # single_product_dim: str | None = None
+    # single_product_cubic_size: str | None = None
+    # single_product_name: str | None = None
+    smallest_product_dim: str | None = None
+    smallest_product_cubic_size: str | None = None
+    smallest_product_name: str | None = None
+    largest_product_dim: str | None = None
+    largest_product_cubic_size: str | None = None
+    largest_product_name: str | None = None
     apollo_result: ApolloResult | None = None
     seamless_result: SeamlessResult | None = None

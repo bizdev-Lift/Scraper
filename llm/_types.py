@@ -1,11 +1,8 @@
 from dataclasses import dataclass
-from typing import Any, TypeAlias
 from io import StringIO
+from typing import Any, TypeAlias
 
-
-GeminiJSONStructure: TypeAlias = dict[
-    str, list[dict[str, dict[str, Any]]] | dict[str, Any]
-]
+GeminiJSONStructure: TypeAlias = dict[str, list[dict[str, dict[str, Any]]] | dict[str, Any]]
 
 
 class GeminiChatCompletion:
@@ -120,18 +117,14 @@ class GeminiResponseUsageMetadata:
         total_token_count = input.get("totalTokenCount")
         thoughts_token_count = input.get("thoughtsTokenCount")
 
-        if (
-            not prompt_token_count
-            or not candidates_token_count
-            or not total_token_count
-        ):
+        if not prompt_token_count or not candidates_token_count or not total_token_count:
             return None
 
         return GeminiResponseUsageMetadata(
             prompt_token_count=prompt_token_count,
             candidates_token_count=candidates_token_count,
             total_token_count=total_token_count,
-            thoughts_token_count=thoughts_token_count
+            thoughts_token_count=thoughts_token_count,
         )
 
 
