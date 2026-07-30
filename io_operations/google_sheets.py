@@ -146,6 +146,14 @@ class RegularSheetStrategy(BaseSheetStrategy):
     def track_old_lead_status(self) -> bool:
         return True
 
+    @property
+    def pre_enrich(self) -> bool:
+        return True
+
+    @property
+    def track_old_lead_status(self) -> bool:
+        return True
+
     def get_records(self) -> list[DomainInput]:
         values = self.get_unique_records(self.sheet.get_all_values("A:J")[1:])
         records = []
@@ -268,6 +276,9 @@ class RegularSheetStrategy(BaseSheetStrategy):
             output.largest_product_name,
             output.redirected_to,
             output.old_lead_status,
+            *asdict(output.apollo_result).values(),
+            *asdict(output.seamless_result).values(),
+            datetime.datetime.now().strftime("%m-%d-%Y"),
         ]
         if is_new_record:
             self.sheet.append_row(

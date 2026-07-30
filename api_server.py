@@ -71,7 +71,6 @@ async def process_company(request: ProcessRequest):
     try:
         logger.info(f"API request received for url: {request.domain_url}")
         result = executor.process_domain(request.domain_url)
-
         logger.info(f"Successfully processed company: {request.domain_url}")
         return result
 
