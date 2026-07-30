@@ -25,6 +25,8 @@ class Settings:
             good_results_sheet=os.environ.get("GOOD_RESULTS_SHEET"),
             skip_results_sheet=os.environ.get("SKIP_RESULTS_SHEET"),
             error_results_sheet=os.environ.get("ERROR_RESULTS_SHEET"),
+            single_spreadsheet_id=os.environ.get("SINGLE_SPREADSHEET_ID"),
+            single_sheet_name=os.environ.get("SINGLE_SHEET_NAME"),
         )
         self.proxy: Any = None
         self.gemini_api_key: str = os.environ["GEMINI_API_KEY"]

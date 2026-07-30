@@ -135,7 +135,8 @@ class RegularSheetStrategy(BaseSheetStrategy):
     """Single-sheet: reads and updates records in place."""
 
     def __init__(self, handler: GoogleSheetsHandler):
-        self.sheet = handler.open_sheet(handler.spreadsheet_info.sheet_name)
+        info = handler.spreadsheet_info
+        self.sheet = handler.open_sheet(info.single_sheet_name, info.single_spreadsheet_id)
 
     @property
     def pre_enrich(self) -> bool:
