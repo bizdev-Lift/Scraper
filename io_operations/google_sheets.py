@@ -1,6 +1,7 @@
 import copy
 import datetime
 import logging
+import os
 import random
 import re
 import time
@@ -97,6 +98,9 @@ class BaseSheetStrategy(ABC):
     @abstractmethod
     def save_results(self, processed: list[dict], failed: list[dict]) -> None: ...
 
+    @abstractmethod
+    def build_response(self, job_id: str) -> dict: ...
+
     @property
     def pre_enrich(self) -> bool:
         return False
@@ -132,6 +136,10 @@ class RegularSheetStrategy(BaseSheetStrategy):
 
     def __init__(self, handler: GoogleSheetsHandler):
         self.sheet = handler.open_sheet(handler.spreadsheet_info.sheet_name)
+
+    @property
+    def pre_enrich(self) -> bool:
+        return True
 
     @property
     def track_old_lead_status(self) -> bool:
@@ -170,9 +178,13 @@ class RegularSheetStrategy(BaseSheetStrategy):
         self._update(record, output)
 
     def save_results(self, processed: list[dict], failed: list[dict]) -> None:
+        scrape_date_str = datetime.datetime.now().strftime("%m-%d-%Y")
         cells = []
-        for item in processed:
+        items = processed + failed
+        for item in items:
             data = item.get("data", {})
+            apollo = data.get("apollo_result", {})
+            seamless = data.get("seamless_result", {})
             row = [
                 data.get("hq_phone_no", ""),
                 data.get("website_availability", ""),
@@ -195,6 +207,9 @@ class RegularSheetStrategy(BaseSheetStrategy):
                 data.get("largest_product_name", ""),
                 data.get("redirected_to", ""),
                 data.get("old_lead_status", ""),
+                *apollo.values(),
+                *seamless.values(),
+                scrape_date_str,
             ]
             for i, val in enumerate(row):
                 cells.append(gspread.Cell(item["row_no"], i + 3, val))
@@ -204,6 +219,25 @@ class RegularSheetStrategy(BaseSheetStrategy):
 
     def on_complete(self, records: list[DomainInput]) -> None:
         pass  # No cleanup needed in regular mode
+
+    def build_response(self, job_id: str) -> dict:
+        records = self.get_records()
+        CHUNK_SIZE = int(os.getenv("CHUNK_SIZE", "5"))
+        chunks = []
+        for i in range(0, len(records), CHUNK_SIZE):
+            chunk_records = records[i : i + CHUNK_SIZE]
+            chunks.append(
+                {
+                    "chunk_id": i // CHUNK_SIZE,
+                    "domains": [
+                        {"domain": r.company_url, "row_no": r.row_no} for r in chunk_records
+                    ],
+                    "workflow_mode": "regular",
+                    "job_id": job_id,
+                }
+            )
+        logger.info(f"Split {len(records)} records into {len(chunks)} chunks (job_id={job_id})")
+        return {"workflow_mode": "regular", "job_id": job_id, "chunks": chunks}
 
     def _update(
         self,
@@ -393,6 +427,33 @@ class ProductionSheetStrategy(BaseSheetStrategy):
         for row_no in row_numbers:
             self.input_sheet.delete_rows(row_no)
             time.sleep(0.5)
+
+    def build_response(self, job_id: str) -> dict:
+        seen_records, unseen_records = self.get_records()
+        CHUNK_SIZE = int(os.getenv("CHUNK_SIZE", "5"))
+        chunks = []
+        for i in range(0, len(unseen_records), CHUNK_SIZE):
+            chunk_records = unseen_records[i : i + CHUNK_SIZE]
+            chunks.append(
+                {
+                    "chunk_id": i // CHUNK_SIZE,
+                    "domains": [
+                        {"domain": r.company_url, "row_no": r.row_no} for r in chunk_records
+                    ],
+                    "workflow_mode": "production",
+                    "job_id": job_id,
+                }
+            )
+        logger.info(
+            f"Split {len(unseen_records)} records into {len(chunks)} chunks "
+            f"(job_id={job_id}, skipped={len(seen_records)})"
+        )
+        return {
+            "workflow_mode": "production",
+            "job_id": job_id,
+            "chunks": chunks,
+            "skipped_records": seen_records,
+        }
 
     def _append(
         self,

@@ -15,78 +15,70 @@ s3 = S3Client()
 
 
 def handler(event: dict, context: Any) -> dict:
-    """Read staged worker results from S3, batch save to sheets, delete processed rows."""
     workflow_mode = event.get("workflow_mode", "regular")
     job_id = event.get("job_id", "")
-    all_skipped = event.get("skipped_records", [])
 
     if not job_id:
         logger.error("No job_id in event")
         return {"saved": 0, "deleted": 0}
 
+    strategy = _create_strategy(workflow_mode)
+
+    processed, failed, staging_keys = _read_staged_results(job_id)
+
+    if processed or failed:
+        strategy.save_results(processed, failed)
+
+    to_delete = _resolve_records_to_delete(processed, workflow_mode, event)
+    if workflow_mode == "production" and to_delete:
+        strategy.on_complete(to_delete, job_id=job_id)
+
+    _cleanup_staging(staging_keys)
+
+    logger.info(
+        f"Job {job_id}: {len(processed)} saved, {len(to_delete)} deleted, {len(failed)} failed"
+    )
+    return {"saved": len(processed), "deleted": len(to_delete)}
+
+
+def _create_strategy(workflow_mode: str):
     handler_ = GoogleSheetsHandler(settings.spreadsheet_info)
-    strategy = (
+    return (
         ProductionSheetStrategy(handler_)
         if workflow_mode == "production"
         else RegularSheetStrategy(handler_)
     )
-    prefix = f"staging/{job_id}/"
-    keys = s3.list_objects(prefix)
-    if not keys:
-        records = [
-            DomainInput(row_no=item["row_no"], company_url=item["domain"]) for item in all_skipped
-        ]
-        strategy.on_complete(records, job_id=job_id)
-        logger.info(f"No staged results found at {prefix}")
-        return {"saved": 0, "deleted": 0}
 
-    all_processed = []
-    all_failed = []
+
+def _read_staged_results(job_id: str) -> tuple[list, list, list]:
+    processed, failed = [], []
+    keys = s3.list_objects(f"staging/{job_id}/")
     for key in keys:
+        content = s3.read_content(key)
+        if content is None:
+            continue
         try:
-            content = s3.read_content(key)
-            if content is None:
-                continue
             data = json.loads(content)
-            all_processed.extend(data.get("processed", []))
-            all_failed.extend(data.get("failed", []))
+            processed.extend(data.get("processed", []))
+            failed.extend(data.get("failed", []))
         except Exception as e:
             logger.error(f"Failed to parse s3://{s3.bucket_name}/{key}: {e}")
+    return processed, failed, keys
 
-    if not all_processed and not all_failed:
-        logger.info("No results to save")
-        return {"saved": 0, "deleted": 0}
 
-    print(all_processed)
-    print(all_failed)
-    strategy.save_results(all_processed, all_failed)
-
-    saved_count = 0
-
+def _resolve_records_to_delete(
+    processed: list, workflow_mode: str, event: dict
+) -> list[DomainInput]:
+    to_delete = [DomainInput(row_no=r["row_no"], company_url=r["domain"]) for r in processed]
     if workflow_mode == "production":
-        records = [
-            DomainInput(row_no=item["row_no"], company_url=item["domain"]) for item in all_skipped
-        ]
-        records.extend(
-            [
-                DomainInput(row_no=item["row_no"], company_url=item["domain"])
-                for item in (all_processed + all_failed)
-            ]
+        to_delete.extend(
+            DomainInput(row_no=r["row_no"], company_url=r["domain"])
+            for r in event.get("skipped_records", [])
         )
-        print("Records to delete")
-        print(records)
-        strategy.on_complete(records, job_id=job_id)
-        saved_count = len(records)
-        logger.info(f"Cleanup complete: {saved_count} saved, rows deleted")
+    return to_delete
 
-    # 2. Delete S3 staging files
-    # if job_id:
-    #     keys = s3.list_objects(f"staging/{job_id}/")
-    #     if keys:
-    #         s3.delete_objects(keys)
-    #         logger.info(f"Cleaned up {len(keys)} staging files for job {job_id}")
-    #     else:
-    #         logger.info(f"No staging files found for job {job_id}")
 
-    logger.info(f"Job {job_id}: {saved_count} saved, {len(all_failed)} failed")
-    return {"saved": saved_count, "deleted": saved_count}
+def _cleanup_staging(keys: list[str]) -> None:
+    if keys:
+        s3.delete_objects(keys)
+        logger.info(f"Cleaned up {len(keys)} staging files")
