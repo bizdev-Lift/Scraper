@@ -146,14 +146,6 @@ class RegularSheetStrategy(BaseSheetStrategy):
     def track_old_lead_status(self) -> bool:
         return True
 
-    @property
-    def pre_enrich(self) -> bool:
-        return True
-
-    @property
-    def track_old_lead_status(self) -> bool:
-        return True
-
     def get_records(self) -> list[DomainInput]:
         values = self.get_unique_records(self.sheet.get_all_values("A:J")[1:])
         records = []
@@ -364,13 +356,6 @@ class ProductionSheetStrategy(BaseSheetStrategy):
         if hubspot_payloads:
             # combined = self.hubspot_client.add_companies(hubspot_payloads)
             for payload in hubspot_payloads:
-                if payload["domain"] != "alliedtime.com":
-                    continue
-
-                payload["properties"]["apollo_industry_fixed"] = payload["properties"][
-                    "apollo_industry"
-                ]
-                del payload["properties"]["apollo_industry"]
                 result = self.hubspot_client.add_company(payload)
                 if not result["success"]:
                     logger.error(f"HubSpot batch error: {result['error']}")
