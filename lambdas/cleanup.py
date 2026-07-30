@@ -33,7 +33,8 @@ def handler(event: dict, context: Any) -> dict:
     if workflow_mode == "production" and to_delete:
         strategy.on_complete(to_delete, job_id=job_id)
 
-    _cleanup_staging(staging_keys)
+    # TODO: Until we are in testing phase we won't delete these.
+    # _cleanup_staging(staging_keys)
 
     logger.info(
         f"Job {job_id}: {len(processed)} saved, {len(to_delete)} deleted, {len(failed)} failed"

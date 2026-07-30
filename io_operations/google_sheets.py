@@ -215,7 +215,7 @@ class RegularSheetStrategy(BaseSheetStrategy):
             for i, val in enumerate(row):
                 cells.append(gspread.Cell(item["row_no"], i + 3, val))
         if cells:
-            self.sheet.batch_update(cells)
+            self.sheet.update_cells(cells)
         time.sleep(0.5)
 
     def on_complete(self, records: list[DomainInput]) -> None:
