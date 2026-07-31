@@ -148,7 +148,7 @@ class MainExecutor:
                 record, links, website_url, final_summary_json
             )
 
-        revenue = None  # self.fetch_revenue(company_url=website_url)
+        revenue = self.fetch_revenue(company_url=website_url)
         merged_summary = self.merge_summary_outputs(
             final_summary_json, about_contact_summary_json, revenue
         )
