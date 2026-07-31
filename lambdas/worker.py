@@ -28,9 +28,11 @@ def handler(event: dict, context: Any) -> dict:
     domain_urls = [item["domain"] for item in domains]
     apollo_results = {}
     seamless_results = {}
+    ahrefs_results = {}
     if executor.strategy.pre_enrich:
         apollo_results = executor.apollo_api.enrich_leads(domain_urls)
         seamless_results = executor.seamless_api.enrich_leads(domain_urls)
+        ahrefs_results = executor.ahref_api.enrich_leads(domain_urls)
 
     for item in domains:
         record = DomainInput(
@@ -39,15 +41,17 @@ def handler(event: dict, context: Any) -> dict:
         logger.info(f"Worker processing domain={record.company_url} (row={record.row_no})")
 
         try:
-            apollo_result = seamless_result = None
+            apollo_result = seamless_result = ahrefs_result = None
             if executor.strategy.pre_enrich:
                 apollo_result = apollo_results.get(record.company_url)
                 seamless_result = seamless_results.get(record.company_url)
+                ahrefs_result = ahrefs_results.get(record.company_url)
 
             mode, result = executor.process_domain(
                 record.company_url,
                 apollo_result=apollo_result,
                 seamless_result=seamless_result,
+                ahrefs_result=ahrefs_result,
             )
             if mode == "success":
                 processed.append(

@@ -7,7 +7,8 @@ from typing import Optional
 import tldextract
 from yarl import URL
 
-from _types import ApolloResult, DomainInput, DomainResponse, SeamlessResult
+from _types import AhrefsResult, ApolloResult, DomainInput, DomainResponse, SeamlessResult
+from ahrefs.companies_search import AhrefsAPI
 from apollo.companies_search import ApolloAPI
 from config import settings
 from io_operations.google_sheets import (
@@ -44,6 +45,7 @@ class MainExecutor:
         self.bot_scraper = BotScraper(s3_bucket_name=bucket_name)
         self.apollo_api = ApolloAPI()
         self.seamless_api = SeamlessAPI()
+        self.ahref_api = AhrefsAPI()
 
     def run(self) -> None:
         records = self.strategy.get_records()
@@ -320,6 +322,7 @@ class MainExecutor:
         domain_url: str,
         apollo_result: Optional[ApolloResult] = None,
         seamless_result: Optional[SeamlessResult] = None,
+        ahrefs_result: Optional[AhrefsResult] = None,
     ) -> tuple[str, DomainResponse]:
         """Process a single domain URL without strategy side effects."""
         record = DomainInput(row_no=0, company_url=domain_url)
@@ -329,11 +332,14 @@ class MainExecutor:
                 redirected_to_domain = re.sub(r"http(s)?://(www\.)?", "", result.redirected_to)
                 apollo_result = self.apollo_api.enrich_leads([redirected_to_domain])
                 seamless_result = self.seamless_api.enrich_leads([redirected_to_domain])
+                ahrefs_result = self.ahref_api.enrich_leads([redirected_to_domain])
                 result.apollo_result = apollo_result.get(redirected_to_domain, ApolloResult())
                 result.seamless_result = seamless_result.get(redirected_to_domain, SeamlessResult())
+                result.ahrefs_result = ahrefs_result.get(redirected_to_domain, AhrefsResult())
             else:
                 result.apollo_result = apollo_result
                 result.seamless_result = seamless_result
+                result.ahrefs_result = ahrefs_result
         return mode, result
 
     def compute_lead_status(

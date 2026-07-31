@@ -186,6 +186,7 @@ class RegularSheetStrategy(BaseSheetStrategy):
             data = item.get("data", {})
             apollo = data.get("apollo_result", {})
             seamless = data.get("seamless_result", {})
+            ahrefs = data.get("ahrefs_result", {})
             row = [
                 data.get("hq_phone_no", ""),
                 data.get("website_availability", ""),
@@ -203,13 +204,16 @@ class RegularSheetStrategy(BaseSheetStrategy):
                 data.get("smallest_product_dim", ""),
                 data.get("smallest_product_cubic_size", ""),
                 data.get("smallest_product_name", ""),
+                data.get("smallest_product_price", ""),
                 data.get("largest_product_dim", ""),
                 data.get("largest_product_cubic_size", ""),
                 data.get("largest_product_name", ""),
-                data.get("redirected_to", ""),
-                data.get("old_lead_status", ""),
+                data.get("largest_product_price", ""),
+                data.get("redirected_to") or "",
+                data.get("old_lead_status") or "",
                 *apollo.values(),
                 *seamless.values(),
+                *ahrefs.values(),
                 scrape_date_str,
             ]
             for i, val in enumerate(row):
@@ -270,6 +274,7 @@ class RegularSheetStrategy(BaseSheetStrategy):
             output.old_lead_status,
             *asdict(output.apollo_result).values(),
             *asdict(output.seamless_result).values(),
+            *asdict(output.ahrefs_result).values(),
             datetime.datetime.now().strftime("%m-%d-%Y"),
         ]
         if is_new_record:
@@ -388,6 +393,7 @@ class ProductionSheetStrategy(BaseSheetStrategy):
     def _build_success_row(self, domain: str, data: dict, scrape_date: str) -> list:
         apollo = data.get("apollo_result", {})
         seamless = data.get("seamless_result", {})
+        ahrefs = data.get("ahrefs_result", {})
         return [
             domain,
             domain,
@@ -408,12 +414,15 @@ class ProductionSheetStrategy(BaseSheetStrategy):
             data.get("smallest_product_dim", ""),
             data.get("smallest_product_cubic_size", ""),
             data.get("smallest_product_name", ""),
+            data.get("smallest_product_price", ""),
             data.get("largest_product_dim", ""),
             data.get("largest_product_cubic_size", ""),
             data.get("largest_product_name", ""),
-            data.get("redirected_to", ""),
+            data.get("largest_product_price", ""),
+            data.get("redirected_to") or "",
             *apollo.values(),
             *seamless.values(),
+            *ahrefs.values(),
             scrape_date,
         ]
 
@@ -494,6 +503,7 @@ class ProductionSheetStrategy(BaseSheetStrategy):
                 output.redirected_to,
                 *asdict(output.apollo_result).values(),
                 *asdict(output.seamless_result).values(),
+                *asdict(output.ahrefs_result).values(),
                 scrape_date_str,
             ]
             sheet.append_row(record, table_range="A1")

@@ -35,6 +35,7 @@ class Settings:
         self.zyte_api_key: str = os.environ["ZYTE_API_KEY"]
         self.apollo_api_key: str = os.environ["APOLLO_API_KEY"]
         self.seamless_api_key: str = os.environ["SEAMLESS_API_KEY"]
+        self.ahrefs_api_key: str = os.environ["AHREFS_API_KEY"]
 
     def _validate_env(self) -> None:
         required_vars = [

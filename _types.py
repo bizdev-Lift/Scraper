@@ -56,6 +56,20 @@ class SeamlessResult:
 
 
 @dataclass
+class AhrefsResult:
+    # domain_rating: float | None = None
+    # backlinks: int | None = None
+    # organic_traffic: int | None = None
+    org_traffic_top_by_country: str | None = None
+    org_traffic: str | None = None
+    paid_traffic: str | None = None
+    org_keywords: str | None = None
+    paid_keywords: str | None = None
+    backlinks: str | None = None
+    refdomains: str | None = None
+
+
+@dataclass
 class DomainResponse:
     hq_phone_no: str
     website_availability: Literal["Yes", "No"]
@@ -81,8 +95,11 @@ class DomainResponse:
     smallest_product_dim: str | None = None
     smallest_product_cubic_size: str | None = None
     smallest_product_name: str | None = None
+    smallest_product_price: str | None = None
     largest_product_dim: str | None = None
     largest_product_cubic_size: str | None = None
     largest_product_name: str | None = None
+    largest_product_price: str | None = None
     apollo_result: ApolloResult | None = None
     seamless_result: SeamlessResult | None = None
+    ahrefs_result: AhrefsResult | None = None
