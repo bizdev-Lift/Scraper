@@ -54,9 +54,6 @@ class MainExecutor:
             apollo_results = self.apollo_api.enrich_leads(domains)
             seamless_results = self.seamless_api.enrich_leads(domains)
         for record in records:
-            # if self.strategy.check_seen and self.strategy.is_seen(record):
-            #     self.strategy.on_skip(record)
-            #     continue
             try:
                 output = self._process_record(record)
                 if output:
@@ -109,15 +106,12 @@ class MainExecutor:
 
         if not result.body:
             logger.error(f"Unable to scrape url={record.company_url}. Returning default summary.")
-            # self.strategy.on_error(record, default_summary)
             return "error", default_summary
 
         if result.is_blocked:
             logger.error(f"url={record.company_url} has been blocked. Returning default summary.")
             default_summary.lead_status = "Unqualified - Website Blocked"
-            # self.strategy.on_error(record, default_summary)
             return "error", default_summary
-            # return None
 
         website_url = self._determine_website_url(record.company_url, result.domain_url)
         redirected_to: Optional[str] = None
@@ -138,9 +132,7 @@ class MainExecutor:
             )
             if not final_summary_json:
                 default_summary.lead_status = "Error: LLM Failed"
-            # self.strategy.on_error(record, default_summary)
             return "error", default_summary
-            # return None
 
         about_contact_summary_json: Optional[DomainResponse] = None
         if self._needs_additional_scraping(final_summary_json):
