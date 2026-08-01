@@ -69,6 +69,7 @@ COPY llm ./llm
 COPY scraper ./scraper
 COPY hubspot ./hubspot
 COPY apollo ./apollo
+COPY ahrefs ./ahrefs
 COPY seamless ./seamless
 COPY hubspot ./hubspot
 COPY _types.py _types.py
