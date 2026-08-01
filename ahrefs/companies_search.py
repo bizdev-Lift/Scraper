@@ -1,4 +1,3 @@
-import json
 import time
 
 import requests
@@ -128,5 +127,14 @@ class AhrefsAPI:
     def _format_ahrefs(t: dict) -> AhrefsResult:
         if not t:
             return AhrefsResult()
-        t["org_traffic_top_by_country"] = json.dumps(t["org_traffic_top_by_country"])
+
+        v = t["org_traffic_top_by_country"]
+        t["top_org_traffic_country_name"] = ""
+        t["top_org_traffic_country_value"] = ""
+        if v and isinstance(v, list):
+            t["top_org_traffic_country_name"] = v[0][0]
+            t["top_org_traffic_country_value"] = v[0][1]
+
+        del t["org_traffic_top_by_country"]
+
         return AhrefsResult(**t)
