@@ -111,7 +111,8 @@ class AhrefsAPI:
             logger.exception("Failure to fetch data from Ahrefs")
 
         result = {}
-        for domain, target in zip(domains, targets_output):
+        for i, domain in enumerate(domains):
+            target = targets_output[i] if i < len(targets_output) else None
             if target is None:
                 logger.info(f"[Ahrefs] No data returned for '{domain}'")
             result[domain] = self._format_ahrefs(target or {})

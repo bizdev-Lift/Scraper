@@ -338,9 +338,9 @@ class MainExecutor:
                 result.seamless_result = seamless_result.get(redirected_to_domain, SeamlessResult())
                 result.ahrefs_result = ahrefs_result.get(redirected_to_domain, AhrefsResult())
             else:
-                result.apollo_result = apollo_result
-                result.seamless_result = seamless_result
-                result.ahrefs_result = ahrefs_result
+                result.apollo_result = apollo_result or ApolloResult()
+                result.seamless_result = seamless_result or SeamlessResult()
+                result.ahrefs_result = ahrefs_result or AhrefsResult()
         return mode, result
 
     def compute_lead_status(

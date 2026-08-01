@@ -2,7 +2,7 @@ import json
 from dataclasses import asdict
 from typing import Any
 
-from _types import DomainInput
+from _types import AhrefsResult, DomainInput
 from executor import MainExecutor
 from io_operations.google_sheets import HubSpotDataMapper
 from io_operations.s3_client import S3Client
@@ -45,7 +45,7 @@ def handler(event: dict, context: Any) -> dict:
             if executor.strategy.pre_enrich:
                 apollo_result = apollo_results.get(record.company_url)
                 seamless_result = seamless_results.get(record.company_url)
-                ahrefs_result = ahrefs_results.get(record.company_url)
+                ahrefs_result = ahrefs_results.get(record.company_url, AhrefsResult())
 
             mode, result = executor.process_domain(
                 record.company_url,
