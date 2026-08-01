@@ -89,6 +89,7 @@ class MainExecutor:
             lead_status="Unqualified - Website Down",
             apollo_result=ApolloResult(),
             seamless_result=SeamlessResult(),
+            ahrefs_result=AhrefsResult(),
         )
 
     def _process_record(self, record: DomainInput) -> tuple[str, DomainResponse]:
