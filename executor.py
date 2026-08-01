@@ -327,7 +327,7 @@ class MainExecutor:
         """Process a single domain URL without strategy side effects."""
         record = DomainInput(row_no=0, company_url=domain_url)
         mode, result = self._process_record(record)
-        if mode == "success" and self.strategy.pre_enrich:
+        if self.strategy.pre_enrich:
             if result.redirected_to:
                 redirected_to_domain = re.sub(r"http(s)?://(www\.)?", "", result.redirected_to)
                 apollo_result = self.apollo_api.enrich_leads([redirected_to_domain])

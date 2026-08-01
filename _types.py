@@ -100,6 +100,6 @@ class DomainResponse:
     largest_product_cubic_size: str | None = None
     largest_product_name: str | None = None
     largest_product_price: str | None = None
-    apollo_result: ApolloResult | None = None
-    seamless_result: SeamlessResult | None = None
-    ahrefs_result: AhrefsResult | None = None
+    apollo_result: ApolloResult
+    seamless_result: SeamlessResult
+    ahrefs_result: AhrefsResult
