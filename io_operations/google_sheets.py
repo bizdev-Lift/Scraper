@@ -13,6 +13,7 @@ import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 
 from _types import DomainInput, DomainResponse, GoogleSheetInfo
+from ahrefs.companies_search import AhrefsResult
 from config import settings
 from hubspot.records_api import HubSpotCompaniesClient
 
@@ -187,6 +188,8 @@ class RegularSheetStrategy(BaseSheetStrategy):
             apollo = data.get("apollo_result", {})
             seamless = data.get("seamless_result", {})
             ahrefs = data.get("ahrefs_result", {})
+            if not ahrefs:
+                ahrefs = asdict(AhrefsResult())
             row = [
                 data.get("hq_phone_no", ""),
                 data.get("website_availability", ""),
