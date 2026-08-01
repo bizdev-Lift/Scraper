@@ -28,7 +28,6 @@ class AhrefsAPI:
     # Ahrefs API is capped at 60 requests/minute by default.
     REQUEST_PACING_SECONDS = 1.1
 
-    # SELECT_FIELDS = ["ahrefs_rank", "backlinks", "backlinks_dofollow", "backlinks_internal", "backlinks_nofollow", "backlinks_redirect", "domain_rating", "index", "ip", "linked_domains", "linked_domains_dofollow", "mode", "org_cost", "org_keywords", "org_keywords_11_20", "org_keywords_1_3", "org_keywords_21_50", "org_keywords_4_10", "org_keywords_51_plus", "org_traffic", "org_traffic_top_by_country", "outgoing_links", "outgoing_links_dofollow", "paid_ads", "paid_cost", "paid_keywords", "paid_traffic", "protocol", "refdomains", "refdomains_dofollow", "refdomains_nofollow", "refips", "refips_subnets", "url", "url_rating"]
     SELECT_FIELDS = [
         "org_traffic_top_by_country",
         "org_traffic",
@@ -38,6 +37,7 @@ class AhrefsAPI:
         "backlinks",
         "refdomains",
     ]
+    # SELECT_FIELDS = ["ahrefs_rank", "backlinks", "backlinks_dofollow", "backlinks_internal", "backlinks_nofollow", "backlinks_redirect", "domain_rating", "index", "ip", "linked_domains", "linked_domains_dofollow", "mode", "org_cost", "org_keywords", "org_keywords_11_20", "org_keywords_1_3", "org_keywords_21_50", "org_keywords_4_10", "org_keywords_51_plus", "org_traffic", "org_traffic_top_by_country", "outgoing_links", "outgoing_links_dofollow", "paid_ads", "paid_cost", "paid_keywords", "paid_traffic", "protocol", "refdomains", "refdomains_dofollow", "refdomains_nofollow", "refips", "refips_subnets", "url", "url_rating"]
 
     def __init__(self):
         pass
