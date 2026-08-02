@@ -147,3 +147,10 @@ Please read these notes carefully before adding data to the sheets. Following th
 5. **Making changes safely** — If you need to change the data in a sheet:
    1. Make sure the script is not currently running, or
    2. Disable the EventBridge scheduler first, wait **30 minutes** for any in-flight execution to finish, and only then make your changes to the sheet.
+
+
+
+
+# TODO:
+- Deployment needs to be automated.
+- Alerting Mechanism.
