@@ -135,3 +135,15 @@ The format of the sheet would be like this.
 |Bailey Blossom|baileysblossoms.com|---|---|---|---|---|---|---|---|---|---|
 |Protect Products | protectoproducts.com|---|---|---|---|---|---|---|---|---|---|
 |Beelart Embroidery | beelartembroidery.com|---|---|---|---|---|---|---|---|---|---|
+
+## ⚠️ Important Notes Before Adding Domains
+
+Please read these notes carefully before adding data to the sheets. Following them will prevent data corruption and processing issues.
+
+1. **No duplicates** — Make sure you do not add duplicate domains to the sheet. Duplicate rows can cause the data to get corrupt (e.g., index mismatch, overwritten rows, or misaligned results).
+2. **SingleSheet requirements** — The SingleSheet workflow requires both the **Company Name** and **Company URL** columns to be populated for every row. If either is missing, that row will not be processed.
+3. **Production sheet requirements** — For the production workflow, only the **Company URL** column needs to be populated.
+4. **Do not edit sheets while the pipeline is running** — Once you have added domains, do not alter the sheet (no reordering, no inserting/deleting rows, no editing cells). The pipeline relies on row positions to write results back.
+5. **Making changes safely** — If you need to change the data in a sheet:
+   1. Make sure the script is not currently running, or
+   2. Disable the EventBridge scheduler first, wait **30 minutes** for any in-flight execution to finish, and only then make your changes to the sheet.
