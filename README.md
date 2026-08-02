@@ -14,34 +14,40 @@ A tool for extracting structured data from websites using Large Language Models 
 
 ## 🔑 Environment Variables Required
 
-Create a `.env` file in the project root with the following variables:
+Create a `.prod_env` file in the project root (this is the file `./deploy.sh` loads) with the following variables:
 
 ```bash
-CREDENTIALS_PATH=path_to_your_credentials.json
-GEMINI_API_KEY=your_gemini_api_key
+ENVIRONMENT=production
 AWS_BUCKET_NAME="domain-html-storage-bucket"
 CREDENTIALS_PATH=credentials.json
-GEMINI_API_KEY=<key>
+GEMINI_API_KEY=<your_gemini_api_key>
 MODEL_NAME=gemini-3-flash-preview
+MAX_INPUT_RECORDS=20
 ZYTE_ENABLED=false
-ZYTE_API_KEY=<api_key>
-STATS_SPREADSHEET_ID=1fifyC7tsAwOR8f8osHnKL-CsFJYstYzJcIIwlwj5MXU
-STATS_SHEET=Sheet1
-
-
-# For Single Sheet
-SPREADSHEET_ID=<your_spreadsheet_id>
-SHEET_NAME=<sheet_name>
+ZYTE_API_KEY=<your_zyte_api_key>
+HUBSPOT_API_KEY=<your_hubspot_api_key>
+APOLLO_API_KEY=<your_apollo_api_key>
+SEAMLESS_API_KEY=<your_seamless_api_key>
+AHREFS_API_KEY=<your_ahrefs_api_key>
 
 # For Production Sheet
-SPREADSHEET_ID=<your_spreadsheet_id>
-SHEET_NAME=<sheet_name>
-GOOD_RESULTS_SHEET="Scraper GOOD RESULTS ready to import"
-SKIP_RESULTS_SHEET="Scraper SKIP exist known lead"
-ERROR_RESULTS_SHEET="Scraper ERROR For Manual Scrapping"
+SPREADSHEET_ID=<your_production_spreadsheet_id>
+SHEET_NAME="Scraper Tool INSERT HERE"
+GOOD_RESULTS_SHEET="Scraper GOOD RESULTS History"
+SKIP_RESULTS_SHEET="Scraper SKIP exist known lead History"
+ERROR_RESULTS_SHEET="Scraper ERROR For Manual Scrapping History"
+HUBSPOT_DATABASE_SHEET="Hubspot database March 2026"
+
+# For Single Sheet
+SINGLE_SPREADSHEET_ID=<your_single_sheet_spreadsheet_id>
+SINGLE_SHEET_NAME="Ray -Matt Leads"
+
+# Stats / history tracking
+STATS_SPREADSHEET_ID=<your_stats_spreadsheet_id>
+STATS_SHEET=Sheet1
 ```
 
-There is another optional env called `MAX_INPUT_RECORDS` that you can set to tell the script how many domains should it parse in each execution.
+`MAX_INPUT_RECORDS` is optional — it tells the script how many domains to parse in each execution.
 
 
 
@@ -68,6 +74,59 @@ There is another optional env called `MAX_INPUT_RECORDS` that you can set to tel
     python main.py
     ```
 
+## 🧪 Testing the Lambdas Locally
+
+You can run each Lambda handler locally for debugging via `main.py`. The sample payloads are already defined there, mirroring what the Step Functions pipeline sends at runtime.
+
+1. Make sure the environment variables are available (export them, or source your env file) — otherwise the script fails on import.
+2. Set `TEST_HANDLER` in `main.py` to one of `splitter`, `worker`, or `cleanup`.
+3. Run it:
+   ```bash
+   python main.py
+   ```
+
+### Sample inputs
+
+**Splitter** — only receives the workflow mode:
+```json
+{"workflow_mode": "regular"}
+```
+
+**Worker** — each Map iteration hands the Worker a single chunk:
+```json
+{
+  "chunk_id": 0,
+  "domains": [
+    {"domain": "dtidirect.com", "row_no": 99},
+    {"domain": "accesstoindependence.com", "row_no": 301}
+  ],
+  "workflow_mode": "regular",
+  "job_id": "577d8ab6-b0c3-466e-8be5-e6946cc9e6d8"
+}
+```
+
+**Cleanup** — receives the full state-machine payload (all chunks plus the Map results):
+```json
+{
+  "workflow_mode": "regular",
+  "job_id": "577d8ab6-b0c3-466e-8be5-e6946cc9e6d8",
+  "chunks": [
+    {
+      "chunk_id": 0,
+      "domains": [
+        {"domain": "dtidirect.com", "row_no": 99},
+        {"domain": "accesstoindependence.com", "row_no": 301}
+      ],
+      "workflow_mode": "regular",
+      "job_id": "577d8ab6-b0c3-466e-8be5-e6946cc9e6d8"
+    }
+  ],
+  "results": [
+    {"chunk_id": 0, "domain_count": 3, "status": "ok"}
+  ]
+}
+```
+
 ## ⚙️ How the Code Works
 This application performs automated data insights for each domain using generic scraper along with AI Agent. Important components in this are.
 - `io_operations`: This module contains scripts for fetching and storing data from/to Google Sheets.
@@ -87,32 +146,39 @@ This application performs automated data insights for each domain using generic 
 ![alt text](<architecture_diagram.png>)
 
 ## 🌐 Deployment
-1. Build the image using the following command.
-   ```bash
-   docker buildx build -f Dockerfile --provenance=false -t llm-data-extractor . --platform=linux/amd64 --target=llm-extractor
-   ```
-2. Setup the Repository in the Elastic Container Registry. For more info check [this](https://docs.aws.amazon.com/AmazonECR/latest/userguide/docker-push-ecr-image.html) link.
 
-3. Tag and push the image to the repository
-   ```bash
-   docker tag llm-data-extractor:latest <repository_url>
-   docker push <repository_url>
-   ```
+Deployment is handled entirely by a single script: `./deploy.sh`.
 
-   For example, if my repository url is `383488877661.dkr.ecr.us-east-1.amazonaws.com/llm-data-extractor:latest`, then the commands will be.
-   ```bash
-   docker tag llm-data-extractor:latest 383488877661.dkr.ecr.us-east-1.amazonaws.com/llm-data-extractor:latest
-   docker push 383488877661.dkr.ecr.us-east-1.amazonaws.com/llm-data-extractor:latest
-   ```
+### Prerequisites
+- AWS CLI configured with credentials for the target account
+- Docker
+- `node` and `npm` (the required serverless plugins are installed automatically)
+- `uv`
 
-4. Create the Lambda on AWS. For more info follow [this](https://docs.aws.amazon.com/lambda/latest/dg/images-create.html) link.
+### The `.prod_env` file
+`deploy.sh` loads a `.${STAGE}_env` file from the project root, and the default stage is `prod`. So for the standard flow you need a **`.prod_env`** file populated with all the required environment variables listed in the [Environment Variables Required](#-environment-variables-required) section above. If `.prod_env` is missing, the script aborts with an error.
 
-5. Following Image Configuration need to be set.
-    - **CMD**: executor.lambda_handler
+### Deploy (build & push & deploy)
+```bash
+./deploy.sh --build
+```
 
-6. Following configurations need to be set on AWS Lambda.
-    - **Memory**: 256 MB
-    - **Timeout**: 15 minutes
+This will:
+1. Load `.prod_env`
+2. Install the serverless plugins (`serverless@3`, `serverless-step-functions`, etc.)
+3. Build the Docker image and push it to **ECR** (tagged with the current Git short SHA)
+4. Deploy the **CloudFormation** stack defined in `serverless.yml` — this provisions the Lambda functions, S3 bucket, Step Functions state machines, and EventBridge schedulers
+
+### Deploy an existing image (skip the build)
+```bash
+./deploy.sh --image-tag <git_sha>
+```
+
+### Destroy the stack
+```bash
+./deploy.sh --destroy
+```
+
 
 
 ## 📄 How to switch Lambda between Single and Production Sheet.
