@@ -60,7 +60,6 @@ class AhrefsResult:
     # domain_rating: float | None = None
     # backlinks: int | None = None
     # organic_traffic: int | None = None
-    org_traffic_top_by_country: str | None = None
     top_org_traffic_country_name: str | None = None
     top_org_traffic_country_value: str | None = None
     org_traffic: str | None = None
