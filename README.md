@@ -182,16 +182,28 @@ This will:
 
 
 ## 📄 How to switch Lambda between Single and Production Sheet.
-- This switch is being controlled through an environment variable called `WORKFLOW_MODE`. If you set it to production, it will run against production sheet (NOTE: All the env variables needed by production sheet are mentioned above and should be defined for this to work)
-- If you remove WORKFLOW_MODE variable, it will run by default for a single sheet.
+- The `workflow_mode` is passed as **input** to the state machine — it is not read from an environment variable anymore.
+- The value is **hardcoded inside each Step Functions state machine** (via the `Parameters` field on the `SplitDomains` state), so there are **two separate state machines**:
+  - `DomainDataExtractorStateMachine` → `workflow_mode: "production"` → runs against the production sheet.
+  - `DomainDataExtractorStateMachine_SingleSheet` → `workflow_mode: "regular"` → runs against the single sheet.
+- Both are triggered on their own EventBridge schedulers every 15 minutes.
 
+## 📄 How to Update the Sheets Used
+Each workflow reads its sheet from its own set of environment variables:
 
-## 📄 How to Update Lambda to Use different Sheet
-- If you want to change the sheet with which Lambda will interact, you would have to update two variables. The `SPREADSHEET_ID` can be extracted from the URL of the the sheet. The `SHEET_NAME` is the sheet name from inside the Google Sheet.
+**Production sheet** — uses the plain sheet variables:
 ```bash
 SPREADSHEET_ID=<spreadsheet_id>
 SHEET_NAME=<sheet_name>
 ```
+
+**Single sheet** — uses the `SINGLE_` prefixed variables:
+```bash
+SINGLE_SPREADSHEET_ID=<spreadsheet_id>
+SINGLE_SHEET_NAME=<sheet_name>
+```
+
+`SPREADSHEET_ID` can be extracted from the URL of the sheet. `SHEET_NAME` is the sheet name from inside the Google Sheet.
 
 ## 🖌️ Sheet Format
 The format of the sheet would be like this.
