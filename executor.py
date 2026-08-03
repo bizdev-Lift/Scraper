@@ -143,10 +143,11 @@ class MainExecutor:
                 record, links, website_url, final_summary_json
             )
 
-        revenue = self.fetch_revenue(company_url=website_url)
-        merged_summary = self.merge_summary_outputs(
-            final_summary_json, about_contact_summary_json, revenue
-        )
+        merged_summary = self.merge_summary_outputs(final_summary_json, about_contact_summary_json)
+        if merged_summary.lead_status == "Lift Prime":
+            revenue = self.fetch_revenue(company_url=website_url)
+            if revenue:
+                merged_summary.revenue = revenue
 
         if self.strategy.track_old_lead_status:
             if isinstance(record.old_lead_status, str) and "LLM Failed" in record.old_lead_status:
@@ -285,11 +286,8 @@ class MainExecutor:
         self,
         summary1: DomainResponse,
         summary2: Optional[DomainResponse],
-        revenue: Optional[float],
     ) -> DomainResponse:
         if not summary2:
-            if revenue:
-                summary1.revenue = revenue
             summary1.lead_status = self.compute_lead_status(summary1, summary2)
             return summary1
 
@@ -312,9 +310,6 @@ class MainExecutor:
                 final_summary["lead_status"] = self.compute_lead_status(summary1, summary2)
             else:
                 final_summary[key] = value
-
-        if revenue:
-            final_summary["revenue"] = revenue
 
         return DomainResponse(**final_summary)
 
