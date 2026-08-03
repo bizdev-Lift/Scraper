@@ -28,8 +28,11 @@ class LLMHelper:
     MAIN_PROMPT: Final[str] = "main_prompt"
     REVENUE_PROMPT: Final[str] = "revenue_prompt"
 
-    def __init__(self, sheets_handler: GoogleSheetsHandler):
-        self.model_name = os.environ.get("MODEL_NAME", "gemini-2.0-flash")
+    def __init__(self, workflow_mode: str, sheets_handler: GoogleSheetsHandler):
+        self.model_name = settings.model_name
+        if workflow_mode == "regular" and settings.override_model_name:
+            self.model_name = settings.override_model_name
+
         self.base_url = (
             f"https://generativelanguage.googleapis.com/v1beta/models/"
             f"{self.model_name}:generateContent?key={settings.gemini_api_key}"
@@ -85,7 +88,7 @@ class LLMHelper:
         cost = chat_completion.cost(prompt_tokens, completion_tokens)
         if settings.environment != "dev":
             self.sheets_handler.update_stats(
-                [url, page_name, prompt_tokens, completion_tokens, cost]
+                [url, page_name, prompt_tokens, completion_tokens, cost, self.model_name]
             )
         logger.info(
             f"Tokens used for {url} ({page_name}): P:{prompt_tokens}, C:{completion_tokens}"

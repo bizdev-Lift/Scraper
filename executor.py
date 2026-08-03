@@ -41,7 +41,7 @@ class MainExecutor:
             else RegularSheetStrategy(handler)
         )
         self.scraper = GenericScraper(s3_bucket_name=bucket_name)
-        self.llm_helper = LLMHelper(handler)
+        self.llm_helper = LLMHelper(workflow_mode, handler)
         self.bot_scraper = BotScraper(s3_bucket_name=bucket_name)
         self.apollo_api = ApolloAPI()
         self.seamless_api = SeamlessAPI()
