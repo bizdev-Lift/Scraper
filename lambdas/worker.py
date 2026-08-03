@@ -1,4 +1,5 @@
 import json
+import os
 from dataclasses import asdict
 from typing import Any
 
@@ -11,6 +12,19 @@ from logger import logger
 s3 = S3Client()
 
 
+def _create_executor(workflow_mode: str) -> MainExecutor:
+    original_model = os.environ.get("MODEL_NAME")
+    if workflow_mode == "regular":
+        os.environ["MODEL_NAME"] = os.environ.get("OVERRIDE_MODEL_NAME", original_model or "")
+    try:
+        return MainExecutor(workflow_mode=workflow_mode)
+    finally:
+        if original_model is None:
+            os.environ.pop("MODEL_NAME", None)
+        else:
+            os.environ["MODEL_NAME"] = original_model
+
+
 def handler(event: dict, context: Any) -> dict:
     """Process a chunk of domains and stage results to S3 for batch save."""
     domains = event.get("domains", [])
@@ -21,7 +35,7 @@ def handler(event: dict, context: Any) -> dict:
     if not domains:
         return {"chunk_id": chunk_id, "domain_count": 0, "status": "empty"}
 
-    executor = MainExecutor(workflow_mode=workflow_mode)
+    executor = _create_executor(workflow_mode)
     processed = []
     failed = []
 

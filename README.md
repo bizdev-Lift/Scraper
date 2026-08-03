@@ -22,6 +22,7 @@ AWS_BUCKET_NAME="domain-html-storage-bucket"
 CREDENTIALS_PATH=credentials.json
 GEMINI_API_KEY=<your_gemini_api_key>
 MODEL_NAME=gemini-3-flash-preview
+OVERRIDE_MODEL_NAME=gemini-3.1-flash-lite
 MAX_INPUT_RECORDS=20
 ZYTE_ENABLED=false
 ZYTE_API_KEY=<your_zyte_api_key>
@@ -48,6 +49,8 @@ STATS_SHEET=Sheet1
 ```
 
 `MAX_INPUT_RECORDS` is optional — it tells the script how many domains to parse in each execution.
+
+`OVERRIDE_MODEL_NAME` is optional and **only affects the SingleSheet (regular) workflow**. If defined, the SingleSheet workflow will use this model instead of `MODEL_NAME`. This is useful for testing prompts against a different model without touching the production workflow. For example, to test the regular workflow with `gemini-3.1-flash-lite`, just set `OVERRIDE_MODEL_NAME=gemini-3.1-flash-lite` and the SingleSheet workflow will use it.
 
 
 
