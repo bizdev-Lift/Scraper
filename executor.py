@@ -92,9 +92,18 @@ class MainExecutor:
             ahrefs_result=AhrefsResult(),
         )
 
+    def is_valid_domain(self, domain: str):
+        parts = tldextract.extract(domain)
+        return parts.suffix in settings.valid_domains
+
     def _process_record(self, record: DomainInput) -> tuple[str, DomainResponse]:
         """Process a single record and return the summary, or None on failure."""
         default_summary = self._get_default_summary()
+
+        # We only process US domains.
+        if not self.is_valid_domain(record.company_url):
+            default_summary.lead_status = "Unqualified - Non-US Based"
+            return default_summary
 
         logger.info(f"Processing url={record.company_url}")
 

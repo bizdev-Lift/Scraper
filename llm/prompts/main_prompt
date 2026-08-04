@@ -402,11 +402,13 @@ Miva Merchant, Web Shop Manager, Cart Functionality, Ecwid, Squarespace, Wix, Sm
 - **Jewelry:** Rings, necklaces, bracelets, earrings, watches, gemstones, diamonds, fine or fashion jewelry
 - **Guns / Firearms:** Guns, pistols, rifles, shotguns, ammunition, or firearm accessories
 - **Furniture:** Beds, sofas, couches, dining tables, chairs, desks, dressers, wardrobes, cabinets, bookshelves, TV stands, or any home/office furniture — regardless of assembly requirements
+- **Florist:** Fresh flowers, bouquets, floral arrangements, plants sold as floral gifts, flower bulbs/seeds sold as part of a floral/gifting business, related florist items (vases, floral delivery services, wedding/event florals), and plant nurseries / garden centers
 - **Service-based businesses:** Sites that connect customers to service providers without selling physical products
 
 **CRITICAL: NO INFERENCE.**
 - Do not flag a product based on a keyword alone. Verify the product category from image descriptions, product titles, or category names.
-- Example: A "Spirits" bicycle brand is NOT alcohol. A "Diamond" cleaning product is NOT jewelry.
+- Example: A "Spirits" bicycle brand is NOT alcohol. A "Diamond" cleaning product is NOT jewelry. A "Daisy" clothing brand is NOT a florist.
+- Note: General gift-basket businesses that include flowers as one component (not the primary category) are NOT considered florists.
 
 **Return "Yes" if the PRIMARY product category matches any of the above.**
 **Return "No" otherwise.**
