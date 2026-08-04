@@ -15,8 +15,8 @@ def handler(event: dict, context: Any) -> dict:
     """Process a chunk of domains and stage results to S3 for batch save."""
     domains = event.get("domains", [])
     workflow_mode = event.get("workflow_mode", "regular")
-    job_id = event.get("job_id", "")
     chunk_id = event.get("chunk_id", 0)
+    job_id = event.get("job_id", "")
 
     if not domains:
         return {"chunk_id": chunk_id, "domain_count": 0, "status": "empty"}
