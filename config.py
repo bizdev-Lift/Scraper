@@ -38,7 +38,7 @@ class Settings:
         self.ahrefs_api_key: str = os.environ["AHREFS_API_KEY"]
         self.model_name: str = os.environ["MODEL_NAME"]
         self.override_model_name: str = os.environ.get("OVERRIDE_MODEL_NAME")
-        self.valid_domains: list[str] = [".com", ".us"]
+        self.valid_domains: list[str] = ["com", "us"]
 
     def _validate_env(self) -> None:
         required_vars = [
