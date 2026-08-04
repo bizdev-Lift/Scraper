@@ -103,7 +103,7 @@ class MainExecutor:
         # We only process US domains.
         if not self.is_valid_domain(record.company_url):
             default_summary.lead_status = "Unqualified - Non-US Based"
-            return default_summary
+            return "error", default_summary
 
         logger.info(f"Processing url={record.company_url}")
 
