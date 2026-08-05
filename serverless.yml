@@ -12,8 +12,10 @@ provider:
   memorySize: 512
   logRetentionInDays: 14
   environment:
-    APOLLO_API_KEY: ${env:APOLLO_API_KEY, ""}
+    AHREFS_ENABLED: ${env:AHREFS_ENABLED, "false"}
     AHREFS_API_KEY: ${env:AHREFS_API_KEY, ""}
+    APOLLO_ENABLED: ${env:APOLLO_ENABLED, "false"}
+    APOLLO_API_KEY: ${env:APOLLO_API_KEY, ""}
     AWS_BUCKET_NAME:
       Ref: DomainHtmlStorageBucket
     CREDENTIALS_PATH: ${env:CREDENTIALS_PATH, ""}
@@ -25,6 +27,7 @@ provider:
     MODEL_NAME: ${env:MODEL_NAME, ""}
     OVERRIDE_MODEL_NAME: ${env:OVERRIDE_MODEL_NAME, ""}
     SEAMLESS_API_KEY: ${env:SEAMLESS_API_KEY, ""}
+    SEAMLESS_ENABLED: ${env:SEAMLESS_ENABLED, "false"}
     SHEET_NAME: ${env:SHEET_NAME, ""}
     SINGLE_SPREADSHEET_ID: ${env:SINGLE_SPREADSHEET_ID, ""}
     SINGLE_SHEET_NAME: ${env:SINGLE_SHEET_NAME, ""}

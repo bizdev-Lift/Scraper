@@ -325,26 +325,26 @@ class MainExecutor:
     def process_domain(
         self,
         domain_url: str,
-        apollo_result: Optional[ApolloResult] = None,
-        seamless_result: Optional[SeamlessResult] = None,
-        ahrefs_result: Optional[AhrefsResult] = None,
     ) -> tuple[str, DomainResponse]:
         """Process a single domain URL without strategy side effects."""
         record = DomainInput(row_no=0, company_url=domain_url)
         mode, result = self._process_record(record)
         if self.strategy.pre_enrich:
-            if result.redirected_to:
-                redirected_to_domain = re.sub(r"http(s)?://(www\.)?", "", result.redirected_to)
-                apollo_result = self.apollo_api.enrich_leads([redirected_to_domain])
-                seamless_result = self.seamless_api.enrich_leads([redirected_to_domain])
-                ahrefs_result = self.ahref_api.enrich_leads([redirected_to_domain])
-                result.apollo_result = apollo_result.get(redirected_to_domain, ApolloResult())
-                result.seamless_result = seamless_result.get(redirected_to_domain, SeamlessResult())
-                result.ahrefs_result = ahrefs_result.get(redirected_to_domain, AhrefsResult())
-            else:
-                result.apollo_result = apollo_result or ApolloResult()
-                result.seamless_result = seamless_result or SeamlessResult()
-                result.ahrefs_result = ahrefs_result or AhrefsResult()
+            website_url = record.company_url
+            if result.redirected_to_domain:
+                website_url = re.sub(r"http(s)?://(www\.)?", "", result.redirected_to)
+            apollo_result = (
+                self.apollo_api.enrich_leads([website_url]) if settings.apollo_enabled else {}
+            )
+            seamless_result = (
+                self.seamless_api.enrich_leads([website_url]) if settings.seamless_enabled else {}
+            )
+            ahrefs_result = (
+                self.ahref_api.enrich_leads([website_url]) if settings.ahrefs_enabled else {}
+            )
+            result.apollo_result = apollo_result.get(website_url, ApolloResult())
+            result.seamless_result = seamless_result.get(website_url, SeamlessResult())
+            result.ahrefs_result = ahrefs_result.get(website_url, AhrefsResult())
         return mode, result
 
     def compute_lead_status(

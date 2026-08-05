@@ -31,6 +31,11 @@ APOLLO_API_KEY=<your_apollo_api_key>
 SEAMLESS_API_KEY=<your_seamless_api_key>
 AHREFS_API_KEY=<your_ahrefs_api_key>
 
+# Enrichment providers (default: disabled). Set to true to enable each one.
+APOLLO_ENABLED=false
+SEAMLESS_ENABLED=false
+AHREFS_ENABLED=false
+
 # For Production Sheet
 SPREADSHEET_ID=<your_production_spreadsheet_id>
 SHEET_NAME="Scraper Tool INSERT HERE"
@@ -51,6 +56,8 @@ STATS_SHEET=Sheet1
 `MAX_INPUT_RECORDS` is optional — it tells the script how many domains to parse in each execution.
 
 `OVERRIDE_MODEL_NAME` is optional and **only affects the SingleSheet (regular) workflow**. If defined, the SingleSheet workflow will use this model instead of `MODEL_NAME`. This is useful for testing prompts against a different model without touching the production workflow. For example, to test the regular workflow with `gemini-3.1-flash-lite`, just set `OVERRIDE_MODEL_NAME=gemini-3.1-flash-lite` and the SingleSheet workflow will use it.
+
+`APOLLO_ENABLED`, `SEAMLESS_ENABLED`, and `AHREFS_ENABLED` toggle each enrichment provider (all **default to disabled**). When a provider is disabled, the worker skips the API call and returns empty results for each domain; set to `true` to enable fetching.
 
 
 

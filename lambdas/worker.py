@@ -2,7 +2,7 @@ import json
 from dataclasses import asdict
 from typing import Any
 
-from _types import AhrefsResult, DomainInput
+from _types import DomainInput
 from executor import MainExecutor
 from io_operations.google_sheets import HubSpotDataMapper
 from io_operations.s3_client import S3Client
@@ -24,16 +24,6 @@ def handler(event: dict, context: Any) -> dict:
     executor = MainExecutor(workflow_mode=workflow_mode)
     processed = []
     failed = []
-
-    domain_urls = [item["domain"] for item in domains]
-    apollo_results = {}
-    seamless_results = {}
-    ahrefs_results = {}
-    if executor.strategy.pre_enrich:
-        apollo_results = executor.apollo_api.enrich_leads(domain_urls)
-        seamless_results = executor.seamless_api.enrich_leads(domain_urls)
-        ahrefs_results = executor.ahref_api.enrich_leads(domain_urls)
-
     for item in domains:
         record = DomainInput(
             company_url=item["domain"], company_name=item["domain"], row_no=item["row_no"]
@@ -41,17 +31,8 @@ def handler(event: dict, context: Any) -> dict:
         logger.info(f"Worker processing domain={record.company_url} (row={record.row_no})")
 
         try:
-            apollo_result = seamless_result = ahrefs_result = None
-            if executor.strategy.pre_enrich:
-                apollo_result = apollo_results.get(record.company_url)
-                seamless_result = seamless_results.get(record.company_url)
-                ahrefs_result = ahrefs_results.get(record.company_url, AhrefsResult())
-
             mode, result = executor.process_domain(
                 record.company_url,
-                apollo_result=apollo_result,
-                seamless_result=seamless_result,
-                ahrefs_result=ahrefs_result,
             )
             if mode == "success":
                 processed.append(
