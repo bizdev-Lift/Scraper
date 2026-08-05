@@ -331,7 +331,7 @@ class MainExecutor:
         mode, result = self._process_record(record)
         if self.strategy.pre_enrich:
             website_url = record.company_url
-            if result.redirected_to_domain:
+            if result.redirected_to:
                 website_url = re.sub(r"http(s)?://(www\.)?", "", result.redirected_to)
             apollo_result = (
                 self.apollo_api.enrich_leads([website_url]) if settings.apollo_enabled else {}
