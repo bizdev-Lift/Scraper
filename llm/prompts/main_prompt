@@ -5,7 +5,7 @@
 **Input:**
 <html_content>
 {{CONTENT}}
-</html_content
+</html_content>
 
 ## Analysis Instructions & Questions:
 
@@ -78,14 +78,14 @@
 
 **Look for visible indicators:**
 - **EXPLICIT**
-    - "Add to Cart" or "Buy Now" or "View Cart" buttons or "Cart" icons *associated with specific valid product listings.*  The button must directly add the product to a shopping cart or initiate a clear purchase process. If this button or icon is not present then b2c_sales set to No. The button can have some other type of text as well like "Add to Basket", "Purchase", "Shop Now" etc.
-    - The following visible text phrases also qualify as cart indicators when at least one product with a visible price exists on the same page: "Your Cart", "My Cart", "View Cart", "Shopping Cart"
+    - "Add to Cart" or "Buy Now" or "View Cart", or "Open Cart" buttons or "Cart" icons *associated with specific valid product listings.*  The button must directly add the product to a shopping cart or initiate a clear purchase process. If this button or icon is not present then b2c_sales set to No. The button can have some other type of text as well like "Add to Basket", "Purchase", "Shop Now" etc.
+    - The following visible text phrases also qualify as cart indicators when at least one product with a visible price exists on the same page: "Your Cart", "My Cart", "View Cart", "Open Cart", "Shopping Cart" or something along the lines.
     - Cart icon elements also qualify when atleast one of the THREE of the following are true: (1) the element's class attribute contains any of: `nav-btn-sm_cart`, `nav-btn-icon`, `icon-cart`, `header-cart`, `cart-code`, `cart-link`, `cart-icon`, `cart-trigger`, `cart-toggle`, `mini-cart`, `minicart`, `js-cart`, `cart-btn`, `cart-button`, `cart-widget` and if it has text inside that says `Cart` (2) the element's href attribute contains the word "cart" anywhere (e.g. `/cart`, `/my-cart`, `/shopping-cart`, `/cart/view`, `/checkout/cart`) — this applies to BOTH relative URLs (e.g. /cart, /my-cart, /shopping-cart) AND absolute URLs (e.g. https://www.example.com/cart/, https://store.example.com/my-cart) (3) at least one product with a visible price exists on the page or if price doesn't exists then categories/groups of products should exist.
 
 - If any condition from **EXPLICIT** section is fulfilled then also ensure clear visibility of atleast one product with pricing or there are categories/groups of products listed where you can select and add products to your cart.
 
 **Examples:**
-- **YES:** An **Add to Cart** button or cart is available on the website. If cart is present then check product page features an image, description, price, and a prominent "Add to Cart" button that directly adds the product to a shopping cart. A "Checkout" button is also visible. Products must be actively available to purchase, not marked as "Coming Soon."
+- **YES:** An **Add to Cart** button or cart is available on the website. If cart is present then check product page features an image, description, price, and a prominent "Add to Cart" button/link or something similar text that indicates Cart that directly adds the product to a shopping cart. A "Checkout" button is also visible. Products must be actively available to purchase, not marked as "Coming Soon."
 - **NO:** The website mentions products in general terms but lacks any specific product listings, pricing, or a direct method to purchase them online (e.g., no "Add to Cart" buttons, no "Shop" section). A general "Cart" icon without any way to add products is also not sufficient. Links to product categories *without a direct purchase option on the product page* are also insufficient. A product marked "Coming Soon" without a purchase option also results in "No."
 
 **Important Considerations:**
