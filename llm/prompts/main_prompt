@@ -76,29 +76,42 @@
 ### 4. B2C Sales (Physical Goods) (json_key: b2c_sales)
 **Question:** Does the website sell physical products directly to consumers?
 
-**Look for visible indicators:**
-- **EXPLICIT**
-    - "Add to Cart" or "Buy Now" or "View Cart", or "Open Cart" buttons or "Cart" icons *associated with specific valid product listings.*  The button must directly add the product to a shopping cart or initiate a clear purchase process. If this button or icon is not present then b2c_sales set to No. The button can have some other type of text as well like "Add to Basket", "Purchase", "Shop Now" etc.
-    - The following visible text phrases also qualify as cart indicators when at least one product with a visible price exists on the same page: "Your Cart", "My Cart", "View Cart", "Open Cart", "Shopping Cart" or something along the lines.
-    - Cart icon elements also qualify when atleast one of the THREE of the following are true: (1) the element's class attribute contains any of: `nav-btn-sm_cart`, `nav-btn-icon`, `icon-cart`, `header-cart`, `cart-code`, `cart-link`, `cart-icon`, `cart-trigger`, `cart-toggle`, `mini-cart`, `minicart`, `js-cart`, `cart-btn`, `cart-button`, `cart-widget` and if it has text inside that says `Cart` (2) the element's href attribute contains the word "cart" anywhere (e.g. `/cart`, `/my-cart`, `/shopping-cart`, `/cart/view`, `/checkout/cart`) — this applies to BOTH relative URLs (e.g. /cart, /my-cart, /shopping-cart) AND absolute URLs (e.g. https://www.example.com/cart/, https://store.example.com/my-cart) (3) at least one product with a visible price exists on the page or if price doesn't exists then categories/groups of products should exist.
+**Step 1 — Find a cart signal.** Scan for ANY of the following, present on the same domain/page being analyzed:
+- A visible "Add to Cart," "Buy Now," "Add to Basket," "Purchase," or "Shop Now" button tied to a specific product listing.
+- A visible cart link/icon/text anywhere on the page — e.g. "Cart," "My Cart," "Your Cart," "View Cart," "Open Cart," "Shopping Cart," a cart item count like "Cart (0)," or a cart icon whose `href` contains "cart" (e.g. `/cart`, `/cart.php`, `/my-cart`, `/shopping-cart`) — relative or absolute.
+- A cart icon/button element where ANY of the following attributes contains the substring "cart" (case-insensitive): `class`, `href`, `id`, `data-hook`, `data-testid`, `aria-label`, `title`, `name`. This covers platforms like Wix, Squarespace, and React/Vue-built sites that identify interactive elements via data attributes rather than semantic class names or hrefs (e.g. `data-hook="cart-icon-button"`, `aria-label="Cart"`).
+- The element does not need visible "Cart" text to qualify — an icon-only cart button satisfies this on its own, provided Step 2 (below) is also satisfied.
 
-- If any condition from **EXPLICIT** section is fulfilled then also ensure clear visibility of atleast one product with pricing or there are categories/groups of products listed where you can select and add products to your cart.
+**Domain scope:** Only count a cart signal if it exists on the page/domain being analyzed. A link that navigates to a *different* domain — even a related or sister business site, e.g. an outbound "Online Catalog" or "Shop" link pointing to another URL entirely — does NOT count as a cart signal for this website. That signal belongs to the destination site, not this one.
 
-**Examples:**
-- **YES:** An **Add to Cart** button or cart is available on the website. If cart is present then check product page features an image, description, price, and a prominent "Add to Cart" button/link or something similar text that indicates Cart that directly adds the product to a shopping cart. A "Checkout" button is also visible. Products must be actively available to purchase, not marked as "Coming Soon."
-- **NO:** The website mentions products in general terms but lacks any specific product listings, pricing, or a direct method to purchase them online (e.g., no "Add to Cart" buttons, no "Shop" section). A general "Cart" icon without any way to add products is also not sufficient. Links to product categories *without a direct purchase option on the product page* are also insufficient. A product marked "Coming Soon" without a purchase option also results in "No."
+**Explicitly NOT cart signals:** Words like "Catalog," "Pricing," "Get a Quote," "Online Catalog With Pricing," or a contact/quote form — these indicate a request-a-quote or informational flow, not a functional cart, and must not be treated as satisfying Step 1 even if paired with product photos or category listings.
 
-**Important Considerations:**
-- For `b2c_sales` to be "Yes," the page *must* have  visible references to **Add to Cart** or **Buy Now** buttons or **"Cart" icons**. If the **Cart** is present then also check products, categories of products, OR an active "Shop" section *AND* a direct means of adding those products to a shopping cart or initiating a purchase. Phrases like "Browse our products," "Shop [Product Category]," or visible product names/descriptions are *not enough* unless accompanied by "Add to Cart/Buy Now" functionality.
-- If **Cart** is not present but the reference to products is available then we will start mark `b2c_sales` as `No`.
-- If the *majority* of the content revolves around announcements of closure, liquidation sales, or similar statements indicating the business is no longer actively operating as a standard retail outlet, `b2c_sales` should be "No."
+If NONE of the Step 1 signals are present, on this domain, in the visible HTML → `b2c_sales = "No"`. Stop here.
 
-**Note:** Must be for physical goods, not just services or digital products.
+**Step 2 — Confirm the cart is tied to real products.** If a cart signal was found in Step 1, check that the site also shows EITHER:
+- At least one specific product with a visible price, OR
+- At least one category/collection of products (e.g. product grid, collection tiles, category nav links like "Wedge Anchors," "M35A2 Parts") — a price does **not** need to be visible on the current page for this to count.
 
-**CRITICAL: DO NOT consider elements with `display: none;`, `visibility: hidden;`, or similar styling that hides content from the user OR if any PARENT element has `display: none;`, `visibility: hidden;`, or similar styling.**
-**"CRITICAL: NO INFERENCE.** Do not assume a website sells physical products just because you see a 'Shop' menu link, product images, or price tags. For `b2c_sales` to be 'Yes,' the HTML must contain literal, functional purchase elements (e.g., an 'Add to Cart' button or a 'Cart' icon/link). If you only see a list of products without a direct way to add them to a basket or checkout in the provided code, you must return 'No'."
+This price-OR-category standard applies uniformly to every cart signal type in Step 1 — text-based cart mentions ("Your Cart," "Shopping Cart," etc.) and icon/href-based signals are held to the same bar.
+
+If a cart signal exists but there is no product and no product category/collection anywhere on the site (e.g. a cart icon on a purely informational or service page) → `b2c_sales = "No"`.
+
+If a cart signal exists AND either a priced product or a product category/collection exists → `b2c_sales = "Yes"`.
+
+**Explicitly NOT sufficient on their own (no cart signal present):**
+- A "Shop" menu link, product gallery, or price tag with no cart/add-to-cart/buy-now element anywhere on the site.
+- Phrases like "Browse our products" or "Shop [Category]" without any cart signal.
+- Products marked "Coming Soon" with no purchase mechanism.
+
+**Business-closure override:** If the majority of visible content announces closure, liquidation, or that the business is no longer operating as a standard retail outlet, `b2c_sales = "No"` regardless of any cart signal found.
+
+**Note:** Must be physical goods, not services or digital products only.
+
+**CRITICAL: DO NOT consider elements with `display: none;`, `visibility: hidden;`, or similar styling that hides content from the user, OR where any PARENT element carries that styling.**
 
 *Answer: Yes/No*
+
+**Reasoning requirement:** State which cart signal was found (quote the exact text or `href`/class attribute) and whether it was tied to a priced product or a product category/collection. If "No," state explicitly whether no cart signal was found at all, or a cart signal was found but no products/categories exist anywhere on the site.
 
 ### 5. B2B Sales (json_key: b2b_sales)
 **Question:** Does the website explicitly mention selling to other businesses using specific keywords? This will be False unless the following terms/phrases are present **as a functional business offering.**
