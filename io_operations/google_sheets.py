@@ -1,6 +1,5 @@
 import copy
 import datetime
-import logging
 import os
 import random
 import re
@@ -16,8 +15,7 @@ from _types import DomainInput, DomainResponse, GoogleSheetInfo
 from ahrefs.companies_search import AhrefsResult
 from config import settings
 from hubspot.records_api import HubSpotCompaniesClient
-
-logger = logging.getLogger(__name__)
+from logger import logger
 
 
 class GoogleSheetsError(Exception):

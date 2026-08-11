@@ -1,5 +1,4 @@
 import json
-import logging
 import os
 import random
 import time
@@ -13,8 +12,7 @@ from io_operations.google_sheets import GoogleSheetsHandler
 from llm._types import GeminiChatCompletion, GeminiResponse
 from llm.image_parsing import create_image_parts
 from llm.utils import clean_llm_response_json_data
-
-logger = logging.getLogger(__name__)
+from logger import logger
 
 
 class LLMError(Exception):

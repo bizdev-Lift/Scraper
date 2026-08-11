@@ -1,10 +1,9 @@
-import logging
 import os
 
 import boto3
 from botocore.exceptions import NoCredentialsError
 
-logger = logging.getLogger(__name__)
+from logger import logger
 
 
 class S3Client:
