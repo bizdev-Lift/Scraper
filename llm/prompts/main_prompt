@@ -554,6 +554,17 @@ Miva Merchant, Web Shop Manager, Cart Functionality, Ecwid, Squarespace, Wix, Sm
 - Once the smallest and largest products are identified, search the visible HTML text for a price explicitly associated with that specific product (same product card, listing row, or product detail block).
 - The price must be clearly tied to the named product — not a generic site-wide "starting at" price, not a shipping fee, not a price from a different/unrelated product.
 
+- **Output a plain number only — no currency symbols, no currency codes, no words, no prefix or suffix of any kind:**
+  - Strip lead-in qualifiers entirely: "From", "Starting at", "As low as", "Starting from", "Only", etc.
+  - Strip all currency symbols/codes: `$`, `£`, `€`, `USD`, `EUR`, etc.
+  - Keep only the numeric amount, as a number (not a string), preserving decimals.
+  - Example: `"From $24.95 USD"` → `24.95`
+  - Example: `"Starting at $19.99"` → `19.99`
+  - Example: `"Only £45"` → `45`
+- If a true range is shown for a single product (e.g. `"$20 - $35"`) → output the **lower bound** only as the number: `20`. (Do not average, do not output both numbers, do not keep the range as a string.)
+- If no price is visibly associated with that specific product → return `""`. Do not leave it blank/null, and do not output `0`.
+- CRITICAL: DO NOT consider elements with `display: none;`, `visibility: hidden;`, or similar styling, or where any parent element carries that styling.
+
 - **Strip qualifier words, keep only currency label + number:**
   - Remove lead-in qualifiers entirely: "From", "Starting at", "As low as", "Starting from", "Only", etc. — these are NOT part of the price.
   - Keep the currency symbol and/or currency code exactly as shown, and the numeric amount.
@@ -563,7 +574,6 @@ Miva Merchant, Web Shop Manager, Cart Functionality, Ecwid, Squarespace, Wix, Sm
 - If a true range is shown for a single product (e.g. `"$20 - $35"`) → keep the full range as-is (this is not a qualifier word, it's the actual price structure): `"$20 - $35"`.
 - If no price is visibly associated with that specific product → return `""`. Do not leave it blank/null.
 - CRITICAL: DO NOT consider elements with `display: none;`, `visibility: hidden;`, or similar styling, or where any parent element carries that styling.
-
 
 **Product name fields:**
 - For each of smallest_product_name / largest_product_name, you MUST visually confirm the named product matches what's shown in the corresponding image — do not name a product purely from an HTML listing without checking that an image of it was actually reviewed.
@@ -579,18 +589,18 @@ Miva Merchant, Web Shop Manager, Cart Functionality, Ecwid, Squarespace, Wix, Sm
 - Each `*_dim` field MUST be a single string: `"L x W x H in"` or `""`.
 - Each `*_cubic_size` field MUST be a plain number (e.g. `12096`) or the string `""`.
 - Each `*_name` field MUST be a short string or `""`.
-- Each `*_price` field MUST be a plain string containing ONLY currency label + numeric amount (e.g. `"$14.99"`, `"$24.95 USD"`, `"$20 - $35"`) or `""`. No qualifier words ("From", "Starting at", etc.) should ever appear in this field.
+- Each `*_price` field MUST be a plain number (e.g. `14.99`, `24.95`) or the string `""`. No currency symbols, no currency codes, no qualifier words, no units of any kind — number only.
 
 **Example of CORRECT output:**
 ```json
 "smallest_product_dim": "6 x 4 x 3 in",
 "smallest_product_cubic_size": 72,
 "smallest_product_name": "Travel-size Lotion, 2oz",
-"smallest_product_price": "$8.99",
+"smallest_product_price": 8.99,
 "largest_product_dim": "24 x 18 x 12 in",
 "largest_product_cubic_size": 5184,
-"largest_product_name": "Bulk Gift Set Box"
-"largest_product_price": "$64.99"
+"largest_product_name": "Bulk Gift Set Box",
+"largest_product_price": 64.99
 ```
 
 ## Critical Guidelines:
