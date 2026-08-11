@@ -141,7 +141,7 @@ class RegularSheetStrategy(BaseSheetStrategy):
 
     @property
     def pre_enrich(self) -> bool:
-        return True
+        return False
 
     @property
     def track_old_lead_status(self) -> bool:
@@ -185,12 +185,21 @@ class RegularSheetStrategy(BaseSheetStrategy):
         items = processed + failed
         for item in items:
             data = item.get("data", {})
-            apollo = data.get("apollo_result", {})
-            seamless = data.get("seamless_result", {})
-            ahrefs = data.get("ahrefs_result", {})
-            traffic_result = data.get("traffic_result", {})
-            if not ahrefs:
-                ahrefs = asdict(AhrefsResult())
+            api_results = []
+            if self.pre_enrich:
+                apollo = data.get("apollo_result", {})
+                seamless = data.get("seamless_result", {})
+                ahrefs = data.get("ahrefs_result", {})
+                traffic_result = data.get("traffic_result", {})
+                if not ahrefs:
+                    ahrefs = asdict(AhrefsResult())
+                api_results = [
+                    *apollo.values(),
+                    *seamless.values(),
+                    *ahrefs.values(),
+                    *traffic_result.values(),
+                ]
+
             row = [
                 data.get("hq_phone_no", ""),
                 data.get("website_availability", ""),
@@ -215,10 +224,7 @@ class RegularSheetStrategy(BaseSheetStrategy):
                 data.get("largest_product_price", ""),
                 data.get("redirected_to") or "",
                 data.get("old_lead_status") or "",
-                *apollo.values(),
-                *seamless.values(),
-                *ahrefs.values(),
-                *traffic_result.values(),
+                *api_results,
                 scrape_date_str,
             ]
             for i, val in enumerate(row):
@@ -305,7 +311,7 @@ class ProductionSheetStrategy(BaseSheetStrategy):
 
     @property
     def pre_enrich(self) -> bool:
-        return True
+        return False
 
     @property
     def check_seen(self) -> bool:
@@ -396,10 +402,19 @@ class ProductionSheetStrategy(BaseSheetStrategy):
             time.sleep(0.5)
 
     def _build_success_row(self, domain: str, data: dict, scrape_date: str) -> list:
-        apollo = data.get("apollo_result", {})
-        seamless = data.get("seamless_result", {})
-        ahrefs = data.get("ahrefs_result", {})
-        traffic_result = data.get("traffic_result", {})
+        api_results = []
+        if self.pre_enrich:
+            apollo = data.get("apollo_result", {})
+            seamless = data.get("seamless_result", {})
+            ahrefs = data.get("ahrefs_result", {})
+            traffic_result = data.get("traffic_result", {})
+            api_results = [
+                *apollo.values(),
+                *seamless.values(),
+                *ahrefs.values(),
+                *traffic_result.values(),
+            ]
+
         return [
             domain,
             domain,
@@ -426,10 +441,7 @@ class ProductionSheetStrategy(BaseSheetStrategy):
             data.get("largest_product_name", ""),
             data.get("largest_product_price", ""),
             data.get("redirected_to") or "",
-            *apollo.values(),
-            *seamless.values(),
-            *ahrefs.values(),
-            *traffic_result.values(),
+            *api_results,
             scrape_date,
         ]
 
@@ -571,14 +583,14 @@ class HubSpotDataMapper:
                 "scraper_carriers": get_str(output.carriers),
                 "scraper_product_size": get_str(output.product_size_weight),
                 "hs_redirect_domain": get_str(output.redirected_to),
-                "apollo_industry_fixed": get_str(output.apollo_result.industry),
-                "hq_phone_number_apollo": get_str(output.apollo_result.company_phone),
-                "apollo___of_retail_locations": get_str(output.apollo_result.company_state),
-                "apollo_annual_revenue_number_fix_use_this": get_str(
-                    output.apollo_result.annual_revenue
-                ),
-                "employee_count_seamless": get_str(output.seamless_result.num_of_employees),
-                "annual_revenue_seamless": get_str(output.seamless_result.annual_revenue),
+                # "apollo_industry_fixed": get_str(output.apollo_result.industry),
+                # "hq_phone_number_apollo": get_str(output.apollo_result.company_phone),
+                # "apollo___of_retail_locations": get_str(output.apollo_result.company_state),
+                # "apollo_annual_revenue_number_fix_use_this": get_str(
+                #     output.apollo_result.annual_revenue
+                # ),
+                # "employee_count_seamless": get_str(output.seamless_result.num_of_employees),
+                # "annual_revenue_seamless": get_str(output.seamless_result.annual_revenue),
                 "scraper_smallest_product_cubic": get_str(output.smallest_product_cubic_size),
                 "scraper_product_dimensions": get_str(output.smallest_product_dim),
                 "scraper_smallest_product_name": get_str(output.smallest_product_name),
