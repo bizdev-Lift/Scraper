@@ -36,11 +36,13 @@ class Settings:
         self.apollo_api_key: str = os.environ["APOLLO_API_KEY"]
         self.seamless_api_key: str = os.environ["SEAMLESS_API_KEY"]
         self.ahrefs_api_key: str = os.environ["AHREFS_API_KEY"]
+        self.simiarweb_api_key: str = os.environ["SIMILARWEB_API_KEY"]
         self.model_name: str = os.environ["MODEL_NAME"]
         self.override_model_name: str = os.environ.get("OVERRIDE_MODEL_NAME")
         self.apollo_enabled: bool = os.getenv("APOLLO_ENABLED", "false").lower() == "true"
         self.seamless_enabled: bool = os.getenv("SEAMLESS_ENABLED", "false").lower() == "true"
         self.ahrefs_enabled: bool = os.getenv("AHREFS_ENABLED", "false").lower() == "true"
+        self.similarwebapi_enabled: bool = os.getenv("AHREFS_ENABLED", "false").lower() == "true"
         self.valid_domains: list[str] = ["com", "us", "net"]
 
     def _validate_env(self) -> None:

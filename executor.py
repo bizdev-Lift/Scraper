@@ -7,7 +7,14 @@ from typing import Optional
 import tldextract
 from yarl import URL
 
-from _types import AhrefsResult, ApolloResult, DomainInput, DomainResponse, SeamlessResult
+from _types import (
+    AhrefsResult,
+    ApolloResult,
+    DomainInput,
+    DomainResponse,
+    SeamlessResult,
+    SimiarWebClientTrafficData,
+)
 from ahrefs.companies_search import AhrefsAPI
 from apollo.companies_search import ApolloAPI
 from config import settings
@@ -18,6 +25,7 @@ from io_operations.google_sheets import (
 )
 from llm.llm_helpers import LLMHelper
 from logger import logger
+from rapidapi.similarwebapi_search import RapidSimilarWebClient
 from scraper._types import PageRequest
 from scraper.bot_scraper import BotScraper
 from scraper.generic_scraper import GenericScraper
@@ -46,6 +54,7 @@ class MainExecutor:
         self.apollo_api = ApolloAPI()
         self.seamless_api = SeamlessAPI()
         self.ahref_api = AhrefsAPI()
+        self.simiarweb_api_client = RapidSimilarWebClient()
 
     def run(self) -> None:
         records = self.strategy.get_records()
@@ -342,9 +351,15 @@ class MainExecutor:
             ahrefs_result = (
                 self.ahref_api.enrich_leads([website_url]) if settings.ahrefs_enabled else {}
             )
+            traffic_result = (
+                self.simiarweb_api_client.get_domain_traffic(website_url)
+                if settings.similarwebapi_enabled
+                else SimiarWebClientTrafficData
+            )
             result.apollo_result = apollo_result.get(website_url, ApolloResult())
             result.seamless_result = seamless_result.get(website_url, SeamlessResult())
             result.ahrefs_result = ahrefs_result.get(website_url, AhrefsResult())
+            result.traffic_result = traffic_result
         return mode, result
 
     def compute_lead_status(

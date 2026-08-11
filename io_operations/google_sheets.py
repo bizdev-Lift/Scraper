@@ -188,6 +188,7 @@ class RegularSheetStrategy(BaseSheetStrategy):
             apollo = data.get("apollo_result", {})
             seamless = data.get("seamless_result", {})
             ahrefs = data.get("ahrefs_result", {})
+            traffic_result = data.get("traffic_result", {})
             if not ahrefs:
                 ahrefs = asdict(AhrefsResult())
             row = [
@@ -217,6 +218,7 @@ class RegularSheetStrategy(BaseSheetStrategy):
                 *apollo.values(),
                 *seamless.values(),
                 *ahrefs.values(),
+                *traffic_result.values(),
                 scrape_date_str,
             ]
             for i, val in enumerate(row):
