@@ -71,6 +71,15 @@ class AhrefsResult:
 
 
 @dataclass
+class SimiarWebClientTrafficData:
+    latest_monthly_visits: str | None = None
+    bounce_rate: str | None = None
+    page_per_visit: str | None = None
+    search_organic: str | None = None
+    search_paid: str | None = None
+
+
+@dataclass
 class DomainResponse:
     hq_phone_no: str
     website_availability: Literal["Yes", "No"]
@@ -104,3 +113,4 @@ class DomainResponse:
     apollo_result: ApolloResult | None = None
     seamless_result: SeamlessResult | None = None
     ahrefs_result: AhrefsResult | None = None
+    traffic_result: SimiarWebClientTrafficData | None = None
