@@ -41,7 +41,7 @@ class Settings:
         self.apollo_enabled: bool = os.getenv("APOLLO_ENABLED", "false").lower() == "true"
         self.seamless_enabled: bool = os.getenv("SEAMLESS_ENABLED", "false").lower() == "true"
         self.ahrefs_enabled: bool = os.getenv("AHREFS_ENABLED", "false").lower() == "true"
-        self.valid_domains: list[str] = ["com", "us"]
+        self.valid_domains: list[str] = ["com", "us", "net"]
 
     def _validate_env(self) -> None:
         required_vars = [
