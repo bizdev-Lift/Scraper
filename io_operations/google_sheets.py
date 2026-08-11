@@ -399,6 +399,7 @@ class ProductionSheetStrategy(BaseSheetStrategy):
         apollo = data.get("apollo_result", {})
         seamless = data.get("seamless_result", {})
         ahrefs = data.get("ahrefs_result", {})
+        traffic_result = data.get("traffic_result", {})
         return [
             domain,
             domain,
@@ -428,6 +429,7 @@ class ProductionSheetStrategy(BaseSheetStrategy):
             *apollo.values(),
             *seamless.values(),
             *ahrefs.values(),
+            *traffic_result.values(),
             scrape_date,
         ]
 
