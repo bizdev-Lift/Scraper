@@ -586,10 +586,15 @@ Miva Merchant, Web Shop Manager, Cart Functionality, Ecwid, Squarespace, Wix, Sm
 - If the corresponding dimension field is `""`, the cubic size field is also `""` (do not output 0 or null literal — use the string "" for consistency with the rest of the schema).
 
 **OUTPUT FORMAT — STRICT:**
-- Each `*_dim` field MUST be a single string: `"L x W x H in"` or `""`.
+- Each `*_dim` field MUST contain ONLY the dimensions in the exact pattern `"L x W x H in"` — three numbers separated by " x ", followed by the unit. Nothing else. No product descriptions, no justification, no phrases like "estimated at," "represented by," "for packaging purposes," or any other explanatory text. All reasoning, context, and justification belongs ONLY in the top-level `reasoning` object — never inside the field value itself.
 - Each `*_cubic_size` field MUST be a plain number (e.g. `12096`) or the string `""`.
 - Each `*_name` field MUST be a short string or `""`.
 - Each `*_price` field MUST be a plain number (e.g. `14.99`, `24.95`) or the string `""`. No currency symbols, no currency codes, no qualifier words, no units of any kind — number only.
+
+**WRONG vs RIGHT for `*_dim` fields:**
+- ❌ WRONG: `"smallest_product_dim": "The gift card is represented by a flat, credit-card sized image; estimated at 10x5x1 in for packaging purposes."`
+- ✅ RIGHT: `"smallest_product_dim": "10 x 5 x 1 in"`
+  (The explanation — "gift card, flat, credit-card sized, represented by product image" — goes in `reasoning.smallest_product_dim` instead, not in the field itself.)
 
 **Example of CORRECT output:**
 ```json
@@ -602,6 +607,20 @@ Miva Merchant, Web Shop Manager, Cart Functionality, Ecwid, Squarespace, Wix, Sm
 "largest_product_name": "Bulk Gift Set Box",
 "largest_product_price": 64.99
 ```
+
+**Field independence — CRITICAL:**
+- `*_dim`, `*_cubic_size`, `*_name`, and `*_price` are evaluated and populated INDEPENDENTLY of one another. A failure to extract one field must NEVER cause any other field for the same product to be blanked.
+- Specifically: if a product has been visually identified (image inspected, smallest/largest determined) but no price is visibly associated with it, populate `*_dim`, `*_cubic_size`, and `*_name` normally from the visual/HTML inspection, and set ONLY `*_price` to `""`.
+- The only condition that blanks ALL SIX fields together is a failure at the APPLICABILITY CHECK stage (i.e., no images provided at all, b2c_sales/b2b_sales both No, or bad_product_type is Service-based). Once the applicability check has passed and a specific product has been identified, blanking must happen per-field, never as a group.
+
+**Example — price missing, other fields still populated:**
+```json
+"smallest_product_dim": "8 x 5 x 3 in",
+"smallest_product_cubic_size": 120,
+"smallest_product_name": "Pallet Fork Frame Adapter Plate",
+"smallest_product_price": "",
+```
+
 
 ## Critical Guidelines:
 1. **JSON Only**: Only JSON response will be accepted. I have already explained the key names above so the output returned by gemini should be a JSON.
@@ -623,7 +642,14 @@ Miva Merchant, Web Shop Manager, Cart Functionality, Ecwid, Squarespace, Wix, Sm
     - For carriers, reasoning must quote the exact text where each carrier name was found
     - For shipping_methods, reasoning must quote the exact text or signal that determined the value
     - For product_size_weight, reasoning must reference the specific product descriptions or keywords used to classify
-    - For the Estimated Packaging Sizes fields, state the applicability check result. If proceeding, describe what was visually observed in the image(s) for each product referenced (smallest/largest) — shape, apparent size cues, packaging type — before describing how HTML text (if any) was used to refine that estimate. If no meaningful visual detail is mentioned here, treat the estimate as unverified.
+    - For the Estimated Packaging Sizes fields, if any of the 6 fields are empty (`""`), the reasoning MUST state exactly ONE of the following, verbatim as the first sentence:
+      1. `"Applicability check failed: b2c_sales is No and b2b_sales is No."`
+      2. `"Applicability check failed: bad_product_type is Yes (Service-based businesses)."`
+      3. `"Applicability check failed: no images were provided for this page."`
+      4. `"Applicability check passed, but no individual product could be identified in the provided images — only category/collection thumbnails or banner images were available, with no specific product visible to measure."`
+      5. `"Applicability check passed and product images were available, but no price was visibly associated with the identified smallest/largest product."` (this one only blanks the *_price field, not dim/cubic_size/name)
+      - Never leave a field empty without stating which of these five applies. A blank field with no matching sentence in the reasoning is not acceptable output.
+      - If proceeding normally (fields populated), describe what was visually observed in the image(s) for each product referenced (smallest/largest) — shape, apparent size cues, packaging type — before describing how HTML text (if any) was used to refine that estimate.
 
 2. **Visible Content Only:** Base ALL answers exclusively on content that is visible in the provided HTML. **CHECK THE CLASSES AND MAKE SURE THEY DON'T HAVE `display: none` OR `visibility: hidden` IN THEM, EITHER DIRECTLY IN THE STYLE ATTRIBUTE OR IN A CSS CLASS. ALSO, ENSURE THAT NO PARENT ELEMENT OF THE TAG HAS THESE STYLES APPLIED.** This is the MOST IMPORTANT RULE.
 
