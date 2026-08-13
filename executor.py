@@ -41,15 +41,16 @@ class ScrapeResult:
 
 class MainExecutor:
     def __init__(self, workflow_mode: str = "regular") -> None:
+        self.workflow_mode = workflow_mode
         bucket_name = os.environ.get("AWS_BUCKET_NAME")
         handler = GoogleSheetsHandler(settings.spreadsheet_info)
         self.strategy = (
             ProductionSheetStrategy(handler)
-            if workflow_mode == "production"
+            if self.workflow_mode == "production"
             else RegularSheetStrategy(handler)
         )
         self.scraper = GenericScraper(s3_bucket_name=bucket_name)
-        self.llm_helper = LLMHelper(workflow_mode, handler)
+        self.llm_helper = LLMHelper(self.workflow_mode, handler)
         self.bot_scraper = BotScraper(s3_bucket_name=bucket_name)
         self.apollo_api = ApolloAPI()
         self.seamless_api = SeamlessAPI()
@@ -346,7 +347,7 @@ class MainExecutor:
         """Process a single domain URL without strategy side effects."""
         record = DomainInput(row_no=0, company_url=domain_url)
         traffic_data = self.simiarweb_api_client.get_domain_traffic(domain_url)
-        if not self.domain_has_valid_traffic(traffic_data):
+        if self.workflow_mode == "production" and not self.domain_has_valid_traffic(traffic_data):
             default_summary = self._get_default_summary()
             default_summary.lead_status = "Unqualified - Invalid Traffic"
             return "error", self._get_default_summary()
