@@ -29,17 +29,28 @@ class RapidSimilarWebClient:
 
         engagements = raw_response.get("Engagments", {})
         traffic = raw_response.get("TrafficSources", {})
+        us_traffic = 0
+        for item in raw_response.get("TopCountryShares", []):
+            if item.get("CountryCode") == "US":
+                us_traffic = item["Value"]
+                break
 
         return SimiarWebClientTrafficData(
-            latest_monthly_visits=latest_visits,
+            total_monthly_visits=latest_visits,
             bounce_rate=(
                 float(engagements["BounceRate"]) if engagements.get("BounceRate") else None
             ),
             page_per_visit=(
                 float(engagements["PagePerVisit"]) if engagements.get("PagePerVisit") else None
             ),
+            time_on_site=(
+                float(engagements["TimeOnSite"]) if engagements.get("TimeOnSite") else None
+            ),
+            traffic_source_direct=traffic.get("Direct"),
+            traffic_source_referrals=traffic.get("Referrals"),
             search_organic=traffic.get("SearchOrganic"),
             search_paid=traffic.get("SearchPaid"),
+            us_traffic=us_traffic,
         )
 
     def get_domain_traffic(self, domain: str) -> dict:

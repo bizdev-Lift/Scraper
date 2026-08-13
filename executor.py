@@ -331,12 +331,26 @@ class MainExecutor:
 
         return DomainResponse(**final_summary)
 
+    def domain_has_valid_traffic(self, traffic_data: SimiarWebClientTrafficData) -> bool:
+        if traffic_data.total_monthly_visits < 100 or traffic_data.total_monthly_visits > 500000:
+            return False
+        elif traffic_data.us_traffic < 0.5:
+            return False
+        else:
+            return True
+
     def process_domain(
         self,
         domain_url: str,
     ) -> tuple[str, DomainResponse]:
         """Process a single domain URL without strategy side effects."""
         record = DomainInput(row_no=0, company_url=domain_url)
+        traffic_data = self.simiarweb_api_client.get_domain_traffic(domain_url)
+        if not self.domain_has_valid_traffic(traffic_data):
+            default_summary = self._get_default_summary()
+            default_summary.lead_status = "Unqualified - Invalid Traffic"
+            return "error", self._get_default_summary()
+
         mode, result = self._process_record(record)
         if self.strategy.pre_enrich:
             website_url = record.company_url
@@ -351,15 +365,10 @@ class MainExecutor:
             ahrefs_result = (
                 self.ahref_api.enrich_leads([website_url]) if settings.ahrefs_enabled else {}
             )
-            traffic_result = (
-                self.simiarweb_api_client.get_domain_traffic(website_url)
-                if settings.similarwebapi_enabled
-                else SimiarWebClientTrafficData
-            )
             result.apollo_result = apollo_result.get(website_url, ApolloResult())
             result.seamless_result = seamless_result.get(website_url, SeamlessResult())
             result.ahrefs_result = ahrefs_result.get(website_url, AhrefsResult())
-            result.traffic_result = traffic_result
+            result.traffic_result = traffic_data
         return mode, result
 
     def compute_lead_status(
