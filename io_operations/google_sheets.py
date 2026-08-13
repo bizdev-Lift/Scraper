@@ -12,7 +12,6 @@ import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 
 from _types import DomainInput, DomainResponse, GoogleSheetInfo
-from ahrefs.companies_search import AhrefsResult
 from config import settings
 from hubspot.records_api import HubSpotCompaniesClient
 from logger import logger
@@ -184,19 +183,19 @@ class RegularSheetStrategy(BaseSheetStrategy):
         for item in items:
             data = item.get("data", {})
             api_results = []
-            if self.pre_enrich:
-                apollo = data.get("apollo_result", {})
-                seamless = data.get("seamless_result", {})
-                ahrefs = data.get("ahrefs_result", {})
-                traffic_result = data.get("traffic_result", {})
-                if not ahrefs:
-                    ahrefs = asdict(AhrefsResult())
-                api_results = [
-                    *apollo.values(),
-                    *seamless.values(),
-                    *ahrefs.values(),
-                    *traffic_result.values(),
-                ]
+            # if self.pre_enrich:
+            #     apollo = data.get("apollo_result", {})
+            #     seamless = data.get("seamless_result", {})
+            #     ahrefs = data.get("ahrefs_result", {})
+            #     # traffic_result = data.get("traffic_result", {})
+            #     if not ahrefs:
+            #         ahrefs = asdict(AhrefsResult())
+            #     api_results = [
+            #         *apollo.values(),
+            #         *seamless.values(),
+            #         *ahrefs.values(),
+            #         *traffic_result.values(),
+            #     ]
 
             row = [
                 data.get("hq_phone_no", ""),
@@ -401,17 +400,17 @@ class ProductionSheetStrategy(BaseSheetStrategy):
 
     def _build_success_row(self, domain: str, data: dict, scrape_date: str) -> list:
         api_results = []
-        if self.pre_enrich:
-            apollo = data.get("apollo_result", {})
-            seamless = data.get("seamless_result", {})
-            ahrefs = data.get("ahrefs_result", {})
-            traffic_result = data.get("traffic_result", {})
-            api_results = [
-                *apollo.values(),
-                *seamless.values(),
-                *ahrefs.values(),
-                *traffic_result.values(),
-            ]
+        # if self.pre_enrich:
+        #     apollo = data.get("apollo_result", {})
+        #     seamless = data.get("seamless_result", {})
+        #     ahrefs = data.get("ahrefs_result", {})
+        #     # traffic_result = data.get("traffic_result", {})
+        #     api_results = [
+        #         *apollo.values(),
+        #         *seamless.values(),
+        #         *ahrefs.values(),
+        #         *traffic_result.values(),
+        #     ]
 
         return [
             domain,
@@ -603,6 +602,7 @@ class HubSpotDataMapper:
                 "traffic_source_search_paid": get_str(output.traffic_result.search_paid),
                 "traffic_source_direct": get_str(output.traffic_result.traffic_source_direct),
                 "traffic_source_referrals": get_str(output.traffic_result.traffic_source_referrals),
+                "lifecyclestage": get_str(output.lifecycle_stage),
                 "usa_traffic": get_str(output.traffic_result.us_traffic),
                 "traffic_enrichment_date": scrape_date.strftime("%Y-%m-%d"),
                 "traffic_enrichment_status_request": "completed",

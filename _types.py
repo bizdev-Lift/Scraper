@@ -118,3 +118,4 @@ class DomainResponse:
     seamless_result: SeamlessResult | None = None
     ahrefs_result: AhrefsResult | None = None
     traffic_result: SimiarWebClientTrafficData | None = None
+    lifecycle_stage: str | None = None
