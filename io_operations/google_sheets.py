@@ -158,6 +158,9 @@ class RegularSheetStrategy(BaseSheetStrategy):
             if record[3] != "" and "LLM Failed" not in record[-1]:
                 continue
 
+            if not GoogleSheetsHandler.is_domain(record[0]):
+                continue
+
             records.append(
                 DomainInput(
                     row_no=index,
@@ -319,14 +322,23 @@ class ProductionSheetStrategy(BaseSheetStrategy):
     def get_records(self) -> list[DomainInput]:
         records = []
         records_to_check = []
+        unseen = []
+        seen = []
         count = copy.deepcopy(settings.max_input_records)
         unique_input_domains = self.get_unique_records(self.input_sheet.get_all_values("A:B")[1:])
         for index, record in enumerate(unique_input_domains, start=2):
             if count == 0:
                 break
-            if record[0] and GoogleSheetsHandler.is_domain(record[0]):
-                records.append(DomainInput(row_no=index, company_url=record[0]))
-                records_to_check.append(record[0])
+
+            if not record[0]:
+                continue
+
+            if not GoogleSheetsHandler.is_domain(record[0]):
+                seen.append({"row_no": index, "domain": record[0]})
+                continue
+
+            records.append(DomainInput(row_no=index, company_url=record[0]))
+            records_to_check.append(record[0])
             count -= 1
 
         history_domains = self._load_history_domains()
@@ -334,8 +346,6 @@ class ProductionSheetStrategy(BaseSheetStrategy):
             self.hubspot_client.get_existing_domains(records_to_check)
         )
 
-        unseen = []
-        seen = []
         for r in records:
             if r.company_url.lower() not in history_domains:
                 unseen.append(r)
