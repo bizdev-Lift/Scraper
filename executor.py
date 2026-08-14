@@ -336,6 +336,14 @@ class MainExecutor:
     def domain_has_valid_traffic(
         self, traffic_data: SimiarWebClientTrafficData
     ) -> tuple[bool, str, str]:
+        """_summary_
+
+        Args:
+            traffic_data (SimiarWebClientTrafficData): _description_
+
+        Returns:
+            tuple[bool, str, str]: _description_
+        """
         lifecycle_stage = ""
         lead_status = ""
         is_valid = False
