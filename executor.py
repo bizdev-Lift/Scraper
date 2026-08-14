@@ -89,10 +89,10 @@ class MainExecutor:
         """Create default summary response for failed processing."""
         return DomainResponse(
             hq_phone_no="",
-            website_availability="No",
-            hq_address_listed="No",
-            b2c_sales="No",
-            b2b_sales="No",
+            website_availability="",
+            hq_address_listed="",
+            b2c_sales="",
+            b2b_sales="",
             industry_classification="na",
             ecommerce_platform="Unknown",
             lead_status="Unqualified - Website Down",

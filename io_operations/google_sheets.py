@@ -182,7 +182,7 @@ class RegularSheetStrategy(BaseSheetStrategy):
         items = processed + failed
         for item in items:
             data = item.get("data", {})
-            api_results = []
+            # api_results = []
             # if self.pre_enrich:
             #     apollo = data.get("apollo_result", {})
             #     seamless = data.get("seamless_result", {})
@@ -196,7 +196,7 @@ class RegularSheetStrategy(BaseSheetStrategy):
             #         *ahrefs.values(),
             #         *traffic_result.values(),
             #     ]
-
+            traffic_result = data.get("traffic_result")
             row = [
                 data.get("hq_phone_no", ""),
                 data.get("website_availability", ""),
@@ -221,7 +221,9 @@ class RegularSheetStrategy(BaseSheetStrategy):
                 data.get("largest_product_price", ""),
                 data.get("redirected_to") or "",
                 data.get("old_lead_status") or "",
-                *api_results,
+                traffic_result.get("total_monthly_visits"),
+                traffic_result.get("us_traffic"),
+                # *api_results,
                 scrape_date_str,
             ]
             for i, val in enumerate(row):
@@ -399,7 +401,7 @@ class ProductionSheetStrategy(BaseSheetStrategy):
             time.sleep(0.5)
 
     def _build_success_row(self, domain: str, data: dict, scrape_date: str) -> list:
-        api_results = []
+        # api_results = []
         # if self.pre_enrich:
         #     apollo = data.get("apollo_result", {})
         #     seamless = data.get("seamless_result", {})
@@ -411,7 +413,7 @@ class ProductionSheetStrategy(BaseSheetStrategy):
         #         *ahrefs.values(),
         #         *traffic_result.values(),
         #     ]
-
+        traffic_result = data.get("traffic_result")
         return [
             domain,
             domain,
@@ -438,7 +440,9 @@ class ProductionSheetStrategy(BaseSheetStrategy):
             data.get("largest_product_name", ""),
             data.get("largest_product_price", ""),
             data.get("redirected_to") or "",
-            *api_results,
+            traffic_result.get("total_monthly_visits"),
+            traffic_result.get("us_traffic"),
+            # *api_results,
             scrape_date,
         ]
 
@@ -561,19 +565,26 @@ class HubSpotDataMapper:
         def get_str(val: Any) -> str:
             return str(val) if val is not None else ""
 
+        lead_status = get_str(output.lead_status)
+        is_skip_scrape = lead_status == "skip scrape"
+
         return {
             "domain": domain_input.company_url,
             "properties": {
                 "name": domain_input.company_url,
                 "website": domain_input.company_url,
                 "confirmed_website___headquarters_phone__": get_str(output.hq_phone_no),
-                "is_website_live_": get_str(output.website_availability),
-                "address_listed_on_website_": get_str(output.hq_address_listed),
-                "do_the_sell_b2c": get_str(output.b2c_sales).lower(),
-                "do_they_sell_b2b": get_str(output.b2b_sales).lower(),
+                "is_website_live_": (
+                    "no" if is_skip_scrape else get_str(output.website_availability)
+                ),
+                "address_listed_on_website_": (
+                    "no" if is_skip_scrape else get_str(output.hq_address_listed)
+                ),
+                "do_the_sell_b2c": "no" if is_skip_scrape else get_str(output.b2c_sales).lower(),
+                "do_they_sell_b2b": "no" if is_skip_scrape else get_str(output.b2b_sales).lower(),
                 "industry_type_verified": get_str(output.industry_classification).lower(),
                 "ecommerce_platform": get_str(output.ecommerce_platform),
-                "scraper_results": get_str(output.lead_status),
+                "scraper_results": lead_status,
                 "hs_lead_status": get_str(output.hs_lead_status),
                 "annual_revenue_scraper": get_str(output.revenue),
                 "scraper_shipping_messages": get_str(output.shipping_messaging),
