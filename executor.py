@@ -316,7 +316,7 @@ class MainExecutor:
         fields2 = asdict(summary2)
 
         for key, value in fields1.items():
-            if value in ["No", "", "N/A"]:
+            if value in ["No", "", "na"]:
                 final_summary[key] = fields2[key]
             elif key == "hq_phone_no" and "@" in value:
                 final_summary[key] = fields2[key]
@@ -372,6 +372,7 @@ class MainExecutor:
             return "success", default_summary
 
         mode, result = self._process_record(record)
+        result.traffic_result = traffic_data
         if self.strategy.pre_enrich:
             website_url = record.company_url
             if result.redirected_to:
@@ -388,7 +389,6 @@ class MainExecutor:
             result.apollo_result = apollo_result.get(website_url, ApolloResult())
             result.seamless_result = seamless_result.get(website_url, SeamlessResult())
             result.ahrefs_result = ahrefs_result.get(website_url, AhrefsResult())
-            result.traffic_result = traffic_data
         return mode, result
 
     def compute_lead_status(
