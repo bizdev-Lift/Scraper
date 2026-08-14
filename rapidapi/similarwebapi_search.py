@@ -20,11 +20,8 @@ class RapidSimilarWebClient:
             "Content-Type": "application/json",
         }
 
-    def _parse_domain_metrics(self, domain: str, raw_response: dict) -> SimiarWebClientTrafficData:
+    def _parse_domain_metrics(self, raw_response: dict) -> SimiarWebClientTrafficData:
         """Parse raw API JSON response into a clean metrics dictionary."""
-        if not raw_response or not isinstance(raw_response, dict):
-            return {"domain": domain, "error": "Invalid API response"}
-
         # Safe extraction of latest monthly visits
         monthly_visits = raw_response.get("EstimatedMonthlyVisits", {})
         latest_visits = monthly_visits.get(max(monthly_visits)) if monthly_visits else None
@@ -68,10 +65,13 @@ class RapidSimilarWebClient:
                     timeout=10,
                 )
                 response.raise_for_status()
-                return self._parse_domain_metrics(domain, response.json())
+                return self._parse_domain_metrics(response.json())
             except requests.exceptions.RequestException as err:
                 count -= 1
                 if count >= 0:
+                    logger.error(
+                        f"Failed while extracting traffic for domain={domain}. Trying again..."
+                    )
                     time.sleep(20)
                     continue
 
