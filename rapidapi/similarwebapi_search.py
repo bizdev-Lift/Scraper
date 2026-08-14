@@ -66,7 +66,7 @@ class RapidSimilarWebClient:
                 )
                 response.raise_for_status()
                 return self._parse_domain_metrics(response.json())
-            except requests.exceptions.RequestException as err:
+            except Exception as err:
                 count -= 1
                 if count >= 0:
                     logger.error(
