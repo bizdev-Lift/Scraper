@@ -580,8 +580,8 @@ class HubSpotDataMapper:
                 "address_listed_on_website_": (
                     "No" if is_skip_scrape else get_str(output.hq_address_listed)
                 ),
-                "do_the_sell_b2c": "No" if is_skip_scrape else get_str(output.b2c_sales).lower(),
-                "do_they_sell_b2b": "No" if is_skip_scrape else get_str(output.b2b_sales).lower(),
+                "do_the_sell_b2c": "no" if is_skip_scrape else get_str(output.b2c_sales).lower(),
+                "do_they_sell_b2b": "no" if is_skip_scrape else get_str(output.b2b_sales).lower(),
                 "industry_type_verified": get_str(output.industry_classification).lower(),
                 "ecommerce_platform": get_str(output.ecommerce_platform),
                 "scraper_results": lead_status,
