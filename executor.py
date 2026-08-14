@@ -93,8 +93,8 @@ class MainExecutor:
             hq_address_listed="No",
             b2c_sales="No",
             b2b_sales="No",
-            industry_classification="N/A",
-            ecommerce_platform="N/A",
+            industry_classification="na",
+            ecommerce_platform="Unknown",
             lead_status="Unqualified - Website Down",
             apollo_result=ApolloResult(),
             seamless_result=SeamlessResult(),
@@ -333,22 +333,25 @@ class MainExecutor:
 
     def domain_has_valid_traffic(
         self, traffic_data: SimiarWebClientTrafficData
-    ) -> tuple[bool, str]:
+    ) -> tuple[bool, str, str]:
         lifecycle_stage = ""
+        lead_status = ""
         is_valid = False
         if traffic_data.total_monthly_visits < 100:
-            lifecycle_stage = "Unqualified - Research Bad Fit (traffic too small)"
+            lifecycle_stage = "1410598780"
+            lead_status = "Unqualified Revenue Less 1 mil"
         if traffic_data.total_monthly_visits > 500000:
-            lifecycle_stage = "Unqualified - Research Bad Fit (too big)"
+            lifecycle_stage = "1410598780"
+            lead_status = "Unqualified Revenue Plus 100 mil"
         elif traffic_data.us_traffic < 0.5:
-            lifecycle_stage = (
-                "Unqualified - Research Bad Fit (US traffic under .5, probably no US based)"
-            )
+            lifecycle_stage = "1410598780"
+            lead_status = "Unqualified Revenue Less 1 mil"
         else:
-            lifecycle_stage = "Lead Lift Commerce"
+            lifecycle_stage = "lead"
+            lead_status = ""
             is_valid = True
 
-        return is_valid, lifecycle_stage
+        return is_valid, lifecycle_stage, lead_status
 
     def process_domain(
         self,
@@ -357,12 +360,13 @@ class MainExecutor:
         """Process a single domain URL without strategy side effects."""
         record = DomainInput(row_no=0, company_url=domain_url)
         traffic_data = self.simiarweb_api_client.get_domain_traffic(domain_url)
-        is_valid, lifecycle_stage = self.domain_has_valid_traffic(traffic_data)
+        is_valid, lifecycle_stage, lead_status = self.domain_has_valid_traffic(traffic_data)
         if not is_valid:
             default_summary = self._get_default_summary()
             default_summary.lifecycle_stage = lifecycle_stage
-            default_summary.lead_status == "NO_SCRAPE"
-            return "success", self._get_default_summary()
+            default_summary.hs_lead_status = lead_status
+            default_summary.traffic_result = traffic_data
+            return "success", default_summary
 
         mode, result = self._process_record(record)
         if self.strategy.pre_enrich:

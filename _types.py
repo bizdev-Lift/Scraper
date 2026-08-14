@@ -119,3 +119,4 @@ class DomainResponse:
     ahrefs_result: AhrefsResult | None = None
     traffic_result: SimiarWebClientTrafficData | None = None
     lifecycle_stage: str | None = None
+    hs_lead_status: str | None = None

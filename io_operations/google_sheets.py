@@ -574,6 +574,7 @@ class HubSpotDataMapper:
                 "industry_type_verified": get_str(output.industry_classification).lower(),
                 "ecommerce_platform": get_str(output.ecommerce_platform),
                 "scraper_results": get_str(output.lead_status),
+                "hs_lead_status": get_str(output.hs_lead_status),
                 "annual_revenue_scraper": get_str(output.revenue),
                 "scraper_shipping_messages": get_str(output.shipping_messaging),
                 "scraper_shipping_methods": get_str(output.shipping_methods),
