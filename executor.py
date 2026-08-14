@@ -345,7 +345,7 @@ class MainExecutor:
         if traffic_data.total_monthly_visits > 500000:
             lifecycle_stage = "1410598780"
             lead_status = "Unqualified Revenue Plus 100 mil"
-        elif traffic_data.us_traffic < 0.5:
+        elif traffic_data.us_traffic < 0.4:
             lifecycle_stage = "1410598780"
             lead_status = "Unqualified Revenue Less 1 mil"
         else:
