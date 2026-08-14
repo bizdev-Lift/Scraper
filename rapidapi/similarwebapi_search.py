@@ -1,3 +1,5 @@
+import time
+
 import requests
 
 from _types import SimiarWebClientTrafficData
@@ -56,18 +58,25 @@ class RapidSimilarWebClient:
     def get_domain_traffic(self, domain: str) -> dict:
         """Fetch and parse metrics for a single domain."""
         querystring = {"domain": domain.lower()}
-        try:
-            response = requests.get(
-                self.BASE_URL,
-                headers=self.headers,
-                params=querystring,
-                timeout=10,
-            )
-            response.raise_for_status()
-            return self._parse_domain_metrics(domain, response.json())
-        except requests.exceptions.RequestException as err:
-            logger.error(f"Error while processing domain={domain}. Error: {err}")
-            return SimiarWebClientTrafficData()
+        count = 3
+        while count > 0:
+            try:
+                response = requests.get(
+                    self.BASE_URL,
+                    headers=self.headers,
+                    params=querystring,
+                    timeout=10,
+                )
+                response.raise_for_status()
+                return self._parse_domain_metrics(domain, response.json())
+            except requests.exceptions.RequestException as err:
+                count -= 1
+                if count >= 0:
+                    time.sleep(20)
+                    continue
+
+                logger.error(f"Error while processing domain={domain}. Error: {err}")
+                return SimiarWebClientTrafficData()
 
     def get_batch_traffic(self, domains: list[str]) -> dict[str, SimiarWebClientTrafficData]:
         """Fetch and parse metrics for a list of domains."""
