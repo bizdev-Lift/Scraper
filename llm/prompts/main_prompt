@@ -5,7 +5,7 @@
 **Input:**
 <html_content>
 {{CONTENT}}
-</html_content
+</html_content>
 
 ## Analysis Instructions & Questions:
 
@@ -76,29 +76,42 @@
 ### 4. B2C Sales (Physical Goods) (json_key: b2c_sales)
 **Question:** Does the website sell physical products directly to consumers?
 
-**Look for visible indicators:**
-- **EXPLICIT**
-    - "Add to Cart" or "Buy Now" or "View Cart" buttons or "Cart" icons *associated with specific valid product listings.*  The button must directly add the product to a shopping cart or initiate a clear purchase process. If this button or icon is not present then b2c_sales set to No. The button can have some other type of text as well like "Add to Basket", "Purchase", "Shop Now" etc.
-    - The following visible text phrases also qualify as cart indicators when at least one product with a visible price exists on the same page: "Your Cart", "My Cart", "View Cart", "Shopping Cart"
-    - Cart icon elements also qualify when atleast one of the THREE of the following are true: (1) the element's class attribute contains any of: `nav-btn-sm_cart`, `nav-btn-icon`, `icon-cart`, `header-cart`, `cart-code`, `cart-link`, `cart-icon`, `cart-trigger`, `cart-toggle`, `mini-cart`, `minicart`, `js-cart`, `cart-btn`, `cart-button`, `cart-widget` and if it has text inside that says `Cart` (2) the element's href attribute contains the word "cart" anywhere (e.g. `/cart`, `/my-cart`, `/shopping-cart`, `/cart/view`, `/checkout/cart`) — this applies to BOTH relative URLs (e.g. /cart, /my-cart, /shopping-cart) AND absolute URLs (e.g. https://www.example.com/cart/, https://store.example.com/my-cart) (3) at least one product with a visible price exists on the page or if price doesn't exists then categories/groups of products should exist.
+**Step 1 — Find a cart signal.** Scan for ANY of the following, present on the same domain/page being analyzed:
+- A visible "Add to Cart," "Buy Now," "Add to Basket," "Purchase," or "Shop Now" button tied to a specific product listing.
+- A visible cart link/icon/text anywhere on the page — e.g. "Cart," "My Cart," "Your Cart," "View Cart," "Open Cart," "Shopping Cart," a cart item count like "Cart (0)," or a cart icon whose `href` contains "cart" (e.g. `/cart`, `/cart.php`, `/my-cart`, `/shopping-cart`) — relative or absolute.
+- A cart icon/button element where ANY of the following attributes contains the substring "cart" (case-insensitive): `class`, `href`, `id`, `data-hook`, `data-testid`, `aria-label`, `title`, `name`. This covers platforms like Wix, Squarespace, and React/Vue-built sites that identify interactive elements via data attributes rather than semantic class names or hrefs (e.g. `data-hook="cart-icon-button"`, `aria-label="Cart"`).
+- The element does not need visible "Cart" text to qualify — an icon-only cart button satisfies this on its own, provided Step 2 (below) is also satisfied.
 
-- If any condition from **EXPLICIT** section is fulfilled then also ensure clear visibility of atleast one product with pricing or there are categories/groups of products listed where you can select and add products to your cart.
+**Domain scope:** Only count a cart signal if it exists on the page/domain being analyzed. A link that navigates to a *different* domain — even a related or sister business site, e.g. an outbound "Online Catalog" or "Shop" link pointing to another URL entirely — does NOT count as a cart signal for this website. That signal belongs to the destination site, not this one.
 
-**Examples:**
-- **YES:** An **Add to Cart** button or cart is available on the website. If cart is present then check product page features an image, description, price, and a prominent "Add to Cart" button that directly adds the product to a shopping cart. A "Checkout" button is also visible. Products must be actively available to purchase, not marked as "Coming Soon."
-- **NO:** The website mentions products in general terms but lacks any specific product listings, pricing, or a direct method to purchase them online (e.g., no "Add to Cart" buttons, no "Shop" section). A general "Cart" icon without any way to add products is also not sufficient. Links to product categories *without a direct purchase option on the product page* are also insufficient. A product marked "Coming Soon" without a purchase option also results in "No."
+**Explicitly NOT cart signals:** Words like "Catalog," "Pricing," "Get a Quote," "Online Catalog With Pricing," or a contact/quote form — these indicate a request-a-quote or informational flow, not a functional cart, and must not be treated as satisfying Step 1 even if paired with product photos or category listings.
 
-**Important Considerations:**
-- For `b2c_sales` to be "Yes," the page *must* have  visible references to **Add to Cart** or **Buy Now** buttons or **"Cart" icons**. If the **Cart** is present then also check products, categories of products, OR an active "Shop" section *AND* a direct means of adding those products to a shopping cart or initiating a purchase. Phrases like "Browse our products," "Shop [Product Category]," or visible product names/descriptions are *not enough* unless accompanied by "Add to Cart/Buy Now" functionality.
-- If **Cart** is not present but the reference to products is available then we will start mark `b2c_sales` as `No`.
-- If the *majority* of the content revolves around announcements of closure, liquidation sales, or similar statements indicating the business is no longer actively operating as a standard retail outlet, `b2c_sales` should be "No."
+If NONE of the Step 1 signals are present, on this domain, in the visible HTML → `b2c_sales = "No"`. Stop here.
 
-**Note:** Must be for physical goods, not just services or digital products.
+**Step 2 — Confirm the cart is tied to real products.** If a cart signal was found in Step 1, check that the site also shows EITHER:
+- At least one specific product with a visible price, OR
+- At least one category/collection of products (e.g. product grid, collection tiles, category nav links like "Wedge Anchors," "M35A2 Parts") — a price does **not** need to be visible on the current page for this to count.
 
-**CRITICAL: DO NOT consider elements with `display: none;`, `visibility: hidden;`, or similar styling that hides content from the user OR if any PARENT element has `display: none;`, `visibility: hidden;`, or similar styling.**
-**"CRITICAL: NO INFERENCE.** Do not assume a website sells physical products just because you see a 'Shop' menu link, product images, or price tags. For `b2c_sales` to be 'Yes,' the HTML must contain literal, functional purchase elements (e.g., an 'Add to Cart' button or a 'Cart' icon/link). If you only see a list of products without a direct way to add them to a basket or checkout in the provided code, you must return 'No'."
+This price-OR-category standard applies uniformly to every cart signal type in Step 1 — text-based cart mentions ("Your Cart," "Shopping Cart," etc.) and icon/href-based signals are held to the same bar.
+
+If a cart signal exists but there is no product and no product category/collection anywhere on the site (e.g. a cart icon on a purely informational or service page) → `b2c_sales = "No"`.
+
+If a cart signal exists AND either a priced product or a product category/collection exists → `b2c_sales = "Yes"`.
+
+**Explicitly NOT sufficient on their own (no cart signal present):**
+- A "Shop" menu link, product gallery, or price tag with no cart/add-to-cart/buy-now element anywhere on the site.
+- Phrases like "Browse our products" or "Shop [Category]" without any cart signal.
+- Products marked "Coming Soon" with no purchase mechanism.
+
+**Business-closure override:** If the majority of visible content announces closure, liquidation, or that the business is no longer operating as a standard retail outlet, `b2c_sales = "No"` regardless of any cart signal found.
+
+**Note:** Must be physical goods, not services or digital products only.
+
+**CRITICAL: DO NOT consider elements with `display: none;`, `visibility: hidden;`, or similar styling that hides content from the user, OR where any PARENT element carries that styling.**
 
 *Answer: Yes/No*
+
+**Reasoning requirement:** State which cart signal was found (quote the exact text or `href`/class attribute) and whether it was tied to a priced product or a product category/collection. If "No," state explicitly whether no cart signal was found at all, or a cart signal was found but no products/categories exist anywhere on the site.
 
 ### 5. B2B Sales (json_key: b2b_sales)
 **Question:** Does the website explicitly mention selling to other businesses using specific keywords? This will be False unless the following terms/phrases are present **as a functional business offering.**
@@ -541,6 +554,17 @@ Miva Merchant, Web Shop Manager, Cart Functionality, Ecwid, Squarespace, Wix, Sm
 - Once the smallest and largest products are identified, search the visible HTML text for a price explicitly associated with that specific product (same product card, listing row, or product detail block).
 - The price must be clearly tied to the named product — not a generic site-wide "starting at" price, not a shipping fee, not a price from a different/unrelated product.
 
+- **Output a plain number only — no currency symbols, no currency codes, no words, no prefix or suffix of any kind:**
+  - Strip lead-in qualifiers entirely: "From", "Starting at", "As low as", "Starting from", "Only", etc.
+  - Strip all currency symbols/codes: `$`, `£`, `€`, `USD`, `EUR`, etc.
+  - Keep only the numeric amount, as a number (not a string), preserving decimals.
+  - Example: `"From $24.95 USD"` → `24.95`
+  - Example: `"Starting at $19.99"` → `19.99`
+  - Example: `"Only £45"` → `45`
+- If a true range is shown for a single product (e.g. `"$20 - $35"`) → output the **lower bound** only as the number: `20`. (Do not average, do not output both numbers, do not keep the range as a string.)
+- If no price is visibly associated with that specific product → return `""`. Do not leave it blank/null, and do not output `0`.
+- CRITICAL: DO NOT consider elements with `display: none;`, `visibility: hidden;`, or similar styling, or where any parent element carries that styling.
+
 - **Strip qualifier words, keep only currency label + number:**
   - Remove lead-in qualifiers entirely: "From", "Starting at", "As low as", "Starting from", "Only", etc. — these are NOT part of the price.
   - Keep the currency symbol and/or currency code exactly as shown, and the numeric amount.
@@ -550,7 +574,6 @@ Miva Merchant, Web Shop Manager, Cart Functionality, Ecwid, Squarespace, Wix, Sm
 - If a true range is shown for a single product (e.g. `"$20 - $35"`) → keep the full range as-is (this is not a qualifier word, it's the actual price structure): `"$20 - $35"`.
 - If no price is visibly associated with that specific product → return `""`. Do not leave it blank/null.
 - CRITICAL: DO NOT consider elements with `display: none;`, `visibility: hidden;`, or similar styling, or where any parent element carries that styling.
-
 
 **Product name fields:**
 - For each of smallest_product_name / largest_product_name, you MUST visually confirm the named product matches what's shown in the corresponding image — do not name a product purely from an HTML listing without checking that an image of it was actually reviewed.
@@ -563,22 +586,41 @@ Miva Merchant, Web Shop Manager, Cart Functionality, Ecwid, Squarespace, Wix, Sm
 - If the corresponding dimension field is `""`, the cubic size field is also `""` (do not output 0 or null literal — use the string "" for consistency with the rest of the schema).
 
 **OUTPUT FORMAT — STRICT:**
-- Each `*_dim` field MUST be a single string: `"L x W x H in"` or `""`.
+- Each `*_dim` field MUST contain ONLY the dimensions in the exact pattern `"L x W x H in"` — three numbers separated by " x ", followed by the unit. Nothing else. No product descriptions, no justification, no phrases like "estimated at," "represented by," "for packaging purposes," or any other explanatory text. All reasoning, context, and justification belongs ONLY in the top-level `reasoning` object — never inside the field value itself.
 - Each `*_cubic_size` field MUST be a plain number (e.g. `12096`) or the string `""`.
 - Each `*_name` field MUST be a short string or `""`.
-- Each `*_price` field MUST be a plain string containing ONLY currency label + numeric amount (e.g. `"$14.99"`, `"$24.95 USD"`, `"$20 - $35"`) or `""`. No qualifier words ("From", "Starting at", etc.) should ever appear in this field.
+- Each `*_price` field MUST be a plain number (e.g. `14.99`, `24.95`) or the string `""`. No currency symbols, no currency codes, no qualifier words, no units of any kind — number only.
+
+**WRONG vs RIGHT for `*_dim` fields:**
+- ❌ WRONG: `"smallest_product_dim": "The gift card is represented by a flat, credit-card sized image; estimated at 10x5x1 in for packaging purposes."`
+- ✅ RIGHT: `"smallest_product_dim": "10 x 5 x 1 in"`
+  (The explanation — "gift card, flat, credit-card sized, represented by product image" — goes in `reasoning.smallest_product_dim` instead, not in the field itself.)
 
 **Example of CORRECT output:**
 ```json
 "smallest_product_dim": "6 x 4 x 3 in",
 "smallest_product_cubic_size": 72,
 "smallest_product_name": "Travel-size Lotion, 2oz",
-"smallest_product_price": "$8.99",
+"smallest_product_price": 8.99,
 "largest_product_dim": "24 x 18 x 12 in",
 "largest_product_cubic_size": 5184,
-"largest_product_name": "Bulk Gift Set Box"
-"largest_product_price": "$64.99"
+"largest_product_name": "Bulk Gift Set Box",
+"largest_product_price": 64.99
 ```
+
+**Field independence — CRITICAL:**
+- `*_dim`, `*_cubic_size`, `*_name`, and `*_price` are evaluated and populated INDEPENDENTLY of one another. A failure to extract one field must NEVER cause any other field for the same product to be blanked.
+- Specifically: if a product has been visually identified (image inspected, smallest/largest determined) but no price is visibly associated with it, populate `*_dim`, `*_cubic_size`, and `*_name` normally from the visual/HTML inspection, and set ONLY `*_price` to `""`.
+- The only condition that blanks ALL SIX fields together is a failure at the APPLICABILITY CHECK stage (i.e., no images provided at all, b2c_sales/b2b_sales both No, or bad_product_type is Service-based). Once the applicability check has passed and a specific product has been identified, blanking must happen per-field, never as a group.
+
+**Example — price missing, other fields still populated:**
+```json
+"smallest_product_dim": "8 x 5 x 3 in",
+"smallest_product_cubic_size": 120,
+"smallest_product_name": "Pallet Fork Frame Adapter Plate",
+"smallest_product_price": "",
+```
+
 
 ## Critical Guidelines:
 1. **JSON Only**: Only JSON response will be accepted. I have already explained the key names above so the output returned by gemini should be a JSON.
@@ -600,7 +642,14 @@ Miva Merchant, Web Shop Manager, Cart Functionality, Ecwid, Squarespace, Wix, Sm
     - For carriers, reasoning must quote the exact text where each carrier name was found
     - For shipping_methods, reasoning must quote the exact text or signal that determined the value
     - For product_size_weight, reasoning must reference the specific product descriptions or keywords used to classify
-    - For the Estimated Packaging Sizes fields, state the applicability check result. If proceeding, describe what was visually observed in the image(s) for each product referenced (smallest/largest) — shape, apparent size cues, packaging type — before describing how HTML text (if any) was used to refine that estimate. If no meaningful visual detail is mentioned here, treat the estimate as unverified.
+    - For the Estimated Packaging Sizes fields, if any of the 6 fields are empty (`""`), the reasoning MUST state exactly ONE of the following, verbatim as the first sentence:
+      1. `"Applicability check failed: b2c_sales is No and b2b_sales is No."`
+      2. `"Applicability check failed: bad_product_type is Yes (Service-based businesses)."`
+      3. `"Applicability check failed: no images were provided for this page."`
+      4. `"Applicability check passed, but no individual product could be identified in the provided images — only category/collection thumbnails or banner images were available, with no specific product visible to measure."`
+      5. `"Applicability check passed and product images were available, but no price was visibly associated with the identified smallest/largest product."` (this one only blanks the *_price field, not dim/cubic_size/name)
+      - Never leave a field empty without stating which of these five applies. A blank field with no matching sentence in the reasoning is not acceptable output.
+      - If proceeding normally (fields populated), describe what was visually observed in the image(s) for each product referenced (smallest/largest) — shape, apparent size cues, packaging type — before describing how HTML text (if any) was used to refine that estimate.
 
 2. **Visible Content Only:** Base ALL answers exclusively on content that is visible in the provided HTML. **CHECK THE CLASSES AND MAKE SURE THEY DON'T HAVE `display: none` OR `visibility: hidden` IN THEM, EITHER DIRECTLY IN THE STYLE ATTRIBUTE OR IN A CSS CLASS. ALSO, ENSURE THAT NO PARENT ELEMENT OF THE TAG HAS THESE STYLES APPLIED.** This is the MOST IMPORTANT RULE.
 

@@ -1,6 +1,5 @@
 import copy
 import datetime
-import logging
 import os
 import random
 import re
@@ -13,11 +12,9 @@ import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 
 from _types import DomainInput, DomainResponse, GoogleSheetInfo
-from ahrefs.companies_search import AhrefsResult
 from config import settings
 from hubspot.records_api import HubSpotCompaniesClient
-
-logger = logging.getLogger(__name__)
+from logger import logger
 
 
 class GoogleSheetsError(Exception):
@@ -141,7 +138,7 @@ class RegularSheetStrategy(BaseSheetStrategy):
 
     @property
     def pre_enrich(self) -> bool:
-        return True
+        return False
 
     @property
     def track_old_lead_status(self) -> bool:
@@ -185,11 +182,21 @@ class RegularSheetStrategy(BaseSheetStrategy):
         items = processed + failed
         for item in items:
             data = item.get("data", {})
-            apollo = data.get("apollo_result", {})
-            seamless = data.get("seamless_result", {})
-            ahrefs = data.get("ahrefs_result", {})
-            if not ahrefs:
-                ahrefs = asdict(AhrefsResult())
+            # api_results = []
+            # if self.pre_enrich:
+            #     apollo = data.get("apollo_result", {})
+            #     seamless = data.get("seamless_result", {})
+            #     ahrefs = data.get("ahrefs_result", {})
+            #     # traffic_result = data.get("traffic_result", {})
+            #     if not ahrefs:
+            #         ahrefs = asdict(AhrefsResult())
+            #     api_results = [
+            #         *apollo.values(),
+            #         *seamless.values(),
+            #         *ahrefs.values(),
+            #         *traffic_result.values(),
+            #     ]
+            traffic_result = data.get("traffic_result")
             row = [
                 data.get("hq_phone_no", ""),
                 data.get("website_availability", ""),
@@ -214,9 +221,9 @@ class RegularSheetStrategy(BaseSheetStrategy):
                 data.get("largest_product_price", ""),
                 data.get("redirected_to") or "",
                 data.get("old_lead_status") or "",
-                *apollo.values(),
-                *seamless.values(),
-                *ahrefs.values(),
+                traffic_result.get("total_monthly_visits"),
+                traffic_result.get("us_traffic"),
+                # *api_results,
                 scrape_date_str,
             ]
             for i, val in enumerate(row):
@@ -303,7 +310,7 @@ class ProductionSheetStrategy(BaseSheetStrategy):
 
     @property
     def pre_enrich(self) -> bool:
-        return True
+        return False
 
     @property
     def check_seen(self) -> bool:
@@ -394,9 +401,19 @@ class ProductionSheetStrategy(BaseSheetStrategy):
             time.sleep(0.5)
 
     def _build_success_row(self, domain: str, data: dict, scrape_date: str) -> list:
-        apollo = data.get("apollo_result", {})
-        seamless = data.get("seamless_result", {})
-        ahrefs = data.get("ahrefs_result", {})
+        # api_results = []
+        # if self.pre_enrich:
+        #     apollo = data.get("apollo_result", {})
+        #     seamless = data.get("seamless_result", {})
+        #     ahrefs = data.get("ahrefs_result", {})
+        #     # traffic_result = data.get("traffic_result", {})
+        #     api_results = [
+        #         *apollo.values(),
+        #         *seamless.values(),
+        #         *ahrefs.values(),
+        #         *traffic_result.values(),
+        #     ]
+        traffic_result = data.get("traffic_result")
         return [
             domain,
             domain,
@@ -423,9 +440,9 @@ class ProductionSheetStrategy(BaseSheetStrategy):
             data.get("largest_product_name", ""),
             data.get("largest_product_price", ""),
             data.get("redirected_to") or "",
-            *apollo.values(),
-            *seamless.values(),
-            *ahrefs.values(),
+            traffic_result.get("total_monthly_visits"),
+            traffic_result.get("us_traffic"),
+            # *api_results,
             scrape_date,
         ]
 
@@ -548,39 +565,59 @@ class HubSpotDataMapper:
         def get_str(val: Any) -> str:
             return str(val) if val is not None else ""
 
+        lead_status = get_str(output.lead_status)
+        is_skip_scrape = lead_status == "skip scrape"
+
         return {
             "domain": domain_input.company_url,
             "properties": {
                 "name": domain_input.company_url,
                 "website": domain_input.company_url,
                 "confirmed_website___headquarters_phone__": get_str(output.hq_phone_no),
-                "is_website_live_": get_str(output.website_availability),
-                "address_listed_on_website_": get_str(output.hq_address_listed),
-                "do_the_sell_b2c": get_str(output.b2c_sales).lower(),
-                "do_they_sell_b2b": get_str(output.b2b_sales).lower(),
+                "is_website_live_": (
+                    "no" if is_skip_scrape else get_str(output.website_availability)
+                ),
+                "address_listed_on_website_": (
+                    "no" if is_skip_scrape else get_str(output.hq_address_listed)
+                ),
+                "do_the_sell_b2c": "no" if is_skip_scrape else get_str(output.b2c_sales).lower(),
+                "do_they_sell_b2b": "no" if is_skip_scrape else get_str(output.b2b_sales).lower(),
                 "industry_type_verified": get_str(output.industry_classification).lower(),
                 "ecommerce_platform": get_str(output.ecommerce_platform),
-                "scraper_results": get_str(output.lead_status),
+                "scraper_results": lead_status,
+                "hs_lead_status": get_str(output.hs_lead_status),
                 "annual_revenue_scraper": get_str(output.revenue),
                 "scraper_shipping_messages": get_str(output.shipping_messaging),
                 "scraper_shipping_methods": get_str(output.shipping_methods),
                 "scraper_carriers": get_str(output.carriers),
                 "scraper_product_size": get_str(output.product_size_weight),
                 "hs_redirect_domain": get_str(output.redirected_to),
-                "apollo_industry_fixed": get_str(output.apollo_result.industry),
-                "hq_phone_number_apollo": get_str(output.apollo_result.company_phone),
-                "apollo___of_retail_locations": get_str(output.apollo_result.company_state),
-                "apollo_annual_revenue_number_fix_use_this": get_str(
-                    output.apollo_result.annual_revenue
-                ),
-                "employee_count_seamless": get_str(output.seamless_result.num_of_employees),
-                "annual_revenue_seamless": get_str(output.seamless_result.annual_revenue),
+                # "apollo_industry_fixed": get_str(output.apollo_result.industry),
+                # "hq_phone_number_apollo": get_str(output.apollo_result.company_phone),
+                # "apollo___of_retail_locations": get_str(output.apollo_result.company_state),
+                # "apollo_annual_revenue_number_fix_use_this": get_str(
+                #     output.apollo_result.annual_revenue
+                # ),
+                # "employee_count_seamless": get_str(output.seamless_result.num_of_employees),
+                # "annual_revenue_seamless": get_str(output.seamless_result.annual_revenue),
                 "scraper_smallest_product_cubic": get_str(output.smallest_product_cubic_size),
                 "scraper_product_dimensions": get_str(output.smallest_product_dim),
                 "scraper_smallest_product_name": get_str(output.smallest_product_name),
                 "scraper_largest_product_cubic": get_str(output.largest_product_cubic_size),
                 "scraper_largest_product_dimensions": get_str(output.largest_product_dim),
                 "scraper_largest_product_name": get_str(output.largest_product_name),
+                "total_monthly_visits": get_str(output.traffic_result.total_monthly_visits),
+                "bounce_rate": get_str(output.traffic_result.bounce_rate),
+                "pages_per_visit": get_str(output.traffic_result.page_per_visit),
+                "time_on_site": get_str(output.traffic_result.time_on_site),
+                "traffic_source_search_organic": get_str(output.traffic_result.search_organic),
+                "traffic_source_search_paid": get_str(output.traffic_result.search_paid),
+                "traffic_source_direct": get_str(output.traffic_result.traffic_source_direct),
+                "traffic_source_referrals": get_str(output.traffic_result.traffic_source_referrals),
+                "lifecyclestage": get_str(output.lifecycle_stage),
+                "usa_traffic": get_str(output.traffic_result.us_traffic),
+                "traffic_enrichment_date": scrape_date.strftime("%Y-%m-%d"),
+                "traffic_enrichment_status_request": "completed",
                 "scrape_date": str(int(scrape_date.timestamp() * 1000)),
             },
         }

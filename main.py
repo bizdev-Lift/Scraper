@@ -17,7 +17,7 @@ from lambdas.worker import handler as worker_handler
 
 TEST_HANDLER = "worker"  # one of: splitter, worker, cleanup
 
-JOB_ID = "577d8ab6-b0c3-466e-8be5-e6946cc9e6d8"
+JOB_ID = "debug-session"
 WORKFLOW_MODE = "regular"
 
 # Splitter only receives the workflow mode.

@@ -1,0 +1,224 @@
+{
+  "name": "HubSpot - Clear Owner for Unqualified Companies",
+  "nodes": [
+    {
+      "parameters": {
+        "url": "https://api.hubapi.com/crm/v3/owners",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "hubspotAppToken",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "limit",
+              "value": "100"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "e39d1d1d-8ea3-4984-bbef-844fd27096bd",
+      "name": "Get Owners",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        224,
+        0
+      ],
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "oRlKNrMVGZZb7WGP",
+          "name": "HubSpot Service Key account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const targets = [\n  'Gene LC Inside Sales',\n  'Ezzo LC Inside Sales'\n].map(name => name.trim().toLowerCase());\n\n\nlet owners = [];\n\nfor (const item of $input.all()) {\n  const results = item.json?.results || [];\n  owners = owners.concat(results);\n}\n\nconst matches = owners.filter(owner => {\n  const fullName = `${owner.firstName || ''} ${owner.lastName || ''}`\n    .trim()\n    .toLowerCase();\n\n  const email = (owner.email || '').trim().toLowerCase();\n\n  return targets.includes(fullName) || targets.includes(email);\n});\n\nif (matches.length === 0) {\n  const availableOwners = owners\n    .map(owner =>\n      `${owner.firstName || ''} ${owner.lastName || ''}`.trim()\n    )\n    .filter(Boolean)\n    .join(', ');\n\n  throw new Error(\n    `No matching HubSpot owners found. Looking for: ${targets.join(', ')}. ` +\n    `Available owners: ${availableOwners}`\n  );\n}\n\nconst missingOwners = targets.filter(target => {\n  return !matches.some(owner => {\n    const fullName = `${owner.firstName || ''} ${owner.lastName || ''}`\n      .trim()\n      .toLowerCase();\n\n    const email = (owner.email || '').trim().toLowerCase();\n\n    return fullName === target || email === target;\n  });\n});\n\nif (missingOwners.length > 0) {\n  const availableOwners = owners\n    .map(owner =>\n      `${owner.firstName || ''} ${owner.lastName || ''}`.trim()\n    )\n    .filter(Boolean)\n    .join(', ');\n\n  throw new Error(\n    `These HubSpot owners were not found: ${missingOwners.join(', ')}. ` +\n    `Available owners: ${availableOwners}`\n  );\n}\n\nreturn matches.map(owner => ({\n  json: {\n    ownerId: String(owner.id),\n    ownerName: `${owner.firstName || ''} ${owner.lastName || ''}`.trim(),\n    ownerEmail: owner.email || ''\n  }\n}));"
+      },
+      "id": "015e8f5d-e184-4edd-b498-5ec8bd8bebf9",
+      "name": "Find Owner ID",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.hubapi.com/crm/v3/objects/companies/search",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "hubspotAppToken",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"filterGroups\": [\n    { \"filters\": [ { \"propertyName\": \"hubspot_owner_id\", \"operator\": \"EQ\", \"value\": \"{{ $json.ownerId }}\" }, {\n          \"propertyName\": \"hs_lead_status\",\n          \"operator\": \"HAS_PROPERTY\"\n        } ] }\n  ],\n  \"properties\": [\"name\", \"hs_lead_status\", \"hubspot_owner_id\"],\n  \"limit\": 200\n}",
+        "options": {
+          "pagination": {
+            "pagination": {
+              "parameters": {
+                "parameters": [
+                  {
+                    "type": "body",
+                    "name": "after",
+                    "value": "={{ $response.body.paging?.next?.after }}"
+                  }
+                ]
+              },
+              "paginationCompleteWhen": "other",
+              "completeExpression": "={{ $response.body.paging?.next?.after === undefined }}",
+              "requestInterval": 300
+            }
+          }
+        }
+      },
+      "id": "708ebaf2-c6b8-4393-9247-8e036d253ddd",
+      "name": "Search Companies",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        672,
+        0
+      ],
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "oRlKNrMVGZZb7WGP",
+          "name": "HubSpot Service Key account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const out = [];\n\nfor (const item of $input.all()) {\n  const companies = item.json?.results || [];\n\n  for (const company of companies) {\n    const props = company.properties || {};\n    const status = (props.hs_lead_status || \"\").toString().trim().toLowerCase();\n\n    const isSubstringMatch = status.includes(\"unqualified\");\n    const isExactMatch = \n      status === \"dm located but cannot reach\" || \n      status === \"# of leads changed to unqualified not interested from unknown\";\n    // Strict, case-sensitive exact match\n    if (isSubstringMatch || isExactMatch) {\n      out.push({\n        json: {\n          companyId: String(company.id),\n          name: props.name || \"\",\n          leadStatus: props.hs_lead_status || \"\"\n        }\n      });\n    }\n  }\n}\n\nreturn out;"
+      },
+      "id": "00416552-acda-4189-a4c2-cd6226fc5da7",
+      "name": "Filter Unqualified Lead Status",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        896,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://api.hubapi.com/crm/v3/objects/companies/{{ $json.companyId }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "hubspotAppToken",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\n  \"properties\": { \"hubspot_owner_id\": \"\", \"lifecyclestage\": \"136007941\" }\n}",
+        "options": {}
+      },
+      "id": "1a750d9e-0c75-4de8-9cb9-eadff58ef27f",
+      "name": "Set Owner to No Owner",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1120,
+        0
+      ],
+      "retryOnFail": true,
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "oRlKNrMVGZZb7WGP",
+          "name": "HubSpot Service Key account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -112,
+        -16
+      ],
+      "id": "b0eac3ed-cb60-43fb-a42a-41e62adb9198",
+      "name": "When Executed by Another Workflow"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Get Owners": {
+      "main": [
+        [
+          {
+            "node": "Find Owner ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Owner ID": {
+      "main": [
+        [
+          {
+            "node": "Search Companies",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search Companies": {
+      "main": [
+        [
+          {
+            "node": "Filter Unqualified Lead Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Unqualified Lead Status": {
+      "main": [
+        [
+          {
+            "node": "Set Owner to No Owner",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Owner to No Owner": {
+      "main": [
+        []
+      ]
+    },
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Get Owners",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "callerPolicy": "any",
+    "availableInMCP": false,
+    "executionTimeout": -1
+  },
+  "versionId": "b9fb231d-582e-4f6e-bbc9-0fe32b9672f9",
+  "meta": {
+    "instanceId": "c3b4cdfdc8e8d0492e2e46c35155e6b8b86e80d2f7d8e0e6e2ff48ab681a70d0"
+  },
+  "nodeGroups": [],
+  "id": "UpHbY5v9QREENLR4",
+  "tags": []
+}

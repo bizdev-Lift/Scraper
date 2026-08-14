@@ -7,7 +7,14 @@ from typing import Optional
 import tldextract
 from yarl import URL
 
-from _types import AhrefsResult, ApolloResult, DomainInput, DomainResponse, SeamlessResult
+from _types import (
+    AhrefsResult,
+    ApolloResult,
+    DomainInput,
+    DomainResponse,
+    SeamlessResult,
+    SimiarWebClientTrafficData,
+)
 from ahrefs.companies_search import AhrefsAPI
 from apollo.companies_search import ApolloAPI
 from config import settings
@@ -18,6 +25,7 @@ from io_operations.google_sheets import (
 )
 from llm.llm_helpers import LLMHelper
 from logger import logger
+from rapidapi.similarwebapi_search import RapidSimilarWebClient
 from scraper._types import PageRequest
 from scraper.bot_scraper import BotScraper
 from scraper.generic_scraper import GenericScraper
@@ -46,6 +54,7 @@ class MainExecutor:
         self.apollo_api = ApolloAPI()
         self.seamless_api = SeamlessAPI()
         self.ahref_api = AhrefsAPI()
+        self.simiarweb_api_client = RapidSimilarWebClient()
 
     def run(self) -> None:
         records = self.strategy.get_records()
@@ -80,12 +89,12 @@ class MainExecutor:
         """Create default summary response for failed processing."""
         return DomainResponse(
             hq_phone_no="",
-            website_availability="No",
-            hq_address_listed="No",
-            b2c_sales="No",
-            b2b_sales="No",
-            industry_classification="N/A",
-            ecommerce_platform="N/A",
+            website_availability="",
+            hq_address_listed="",
+            b2c_sales="",
+            b2b_sales="",
+            industry_classification="na",
+            ecommerce_platform="Unknown",
             lead_status="Unqualified - Website Down",
             apollo_result=ApolloResult(),
             seamless_result=SeamlessResult(),
@@ -102,7 +111,9 @@ class MainExecutor:
 
         # We only process US domains.
         if not self.is_valid_domain(record.company_url):
-            default_summary.lead_status = "Unqualified - Non-US Based"
+            default_summary.lead_status = "Scraper Unqualified - Unqualified - BAD TLD"
+            default_summary.lifecycle_stage = "1410598780"
+            default_summary.hs_lead_status = "Unqualified Revenue Less 1 mil"
             return "error", default_summary
 
         logger.info(f"Processing url={record.company_url}")
@@ -305,7 +316,7 @@ class MainExecutor:
         fields2 = asdict(summary2)
 
         for key, value in fields1.items():
-            if value in ["No", "", "N/A"]:
+            if value in ["No", "", "na"]:
                 final_summary[key] = fields2[key]
             elif key == "hq_phone_no" and "@" in value:
                 final_summary[key] = fields2[key]
@@ -322,13 +333,54 @@ class MainExecutor:
 
         return DomainResponse(**final_summary)
 
+    def domain_has_valid_traffic(
+        self, traffic_data: SimiarWebClientTrafficData
+    ) -> tuple[bool, str, str]:
+        """_summary_
+
+        Args:
+            traffic_data (SimiarWebClientTrafficData): _description_
+
+        Returns:
+            tuple[bool, str, str]: _description_
+        """
+        lifecycle_stage = ""
+        lead_status = ""
+        is_valid = False
+        if traffic_data.total_monthly_visits < 100:
+            lifecycle_stage = "1410598780"
+            lead_status = "Unqualified Revenue Less 1 mil"
+        if traffic_data.total_monthly_visits > 500000:
+            lifecycle_stage = "1410598780"
+            lead_status = "Unqualified Revenue Plus 100 mil"
+        elif traffic_data.us_traffic < 0.4:
+            lifecycle_stage = "1410598780"
+            lead_status = "Unqualified Revenue Less 1 mil"
+        else:
+            lifecycle_stage = "lead"
+            lead_status = ""
+            is_valid = True
+
+        return is_valid, lifecycle_stage, lead_status
+
     def process_domain(
         self,
         domain_url: str,
     ) -> tuple[str, DomainResponse]:
         """Process a single domain URL without strategy side effects."""
         record = DomainInput(row_no=0, company_url=domain_url)
+        traffic_data = self.simiarweb_api_client.get_domain_traffic(domain_url)
+        is_valid, lifecycle_stage, lead_status = self.domain_has_valid_traffic(traffic_data)
+        if not is_valid:
+            default_summary = self._get_default_summary()
+            default_summary.lifecycle_stage = lifecycle_stage
+            default_summary.hs_lead_status = lead_status
+            default_summary.lead_status = "skip scrape"
+            default_summary.traffic_result = traffic_data
+            return "success", default_summary
+
         mode, result = self._process_record(record)
+        result.traffic_result = traffic_data
         if self.strategy.pre_enrich:
             website_url = record.company_url
             if result.redirected_to:
