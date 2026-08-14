@@ -114,7 +114,7 @@ class MainExecutor:
             default_summary.lead_status = "Scraper Unqualified - Unqualified - BAD TLD"
             default_summary.lifecycle_stage = "1410598780"
             default_summary.hs_lead_status = "Unqualified Revenue Less 1 mil"
-            return "error", default_summary
+            return "success", default_summary
 
         logger.info(f"Processing url={record.company_url}")
 
