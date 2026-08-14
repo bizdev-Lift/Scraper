@@ -1,0 +1,408 @@
+{
+  "name": "HubSpot - Lead Assignment to Owners",
+  "nodes": [
+    {
+      "parameters": {
+        "url": "https://api.hubapi.com/crm/v3/owners",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "hubspotAppToken",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "limit",
+              "value": "100"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a383c642-5fab-400d-9fff-2b06e257bf40",
+      "name": "Get Owners",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -144,
+        -16
+      ],
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "oRlKNrMVGZZb7WGP",
+          "name": "HubSpot Service Key account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const targets = [\n  'Gene LC Inside Sales',\n  'Ezzo LC Inside Sales',\n].map(name => name.trim().toLowerCase());\n\n\nlet owners = [];\n\nfor (const item of $input.all()) {\n  const results = item.json?.results || [];\n  owners = owners.concat(results);\n}\n\nconst matches = owners.filter(owner => {\n  const fullName = `${owner.firstName || ''} ${owner.lastName || ''}`\n    .trim()\n    .toLowerCase();\n\n  const email = (owner.email || '').trim().toLowerCase();\n\n  return targets.includes(fullName) || targets.includes(email);\n});\n\nif (matches.length === 0) {\n  const availableOwners = owners\n    .map(owner =>\n      `${owner.firstName || ''} ${owner.lastName || ''}`.trim()\n    )\n    .filter(Boolean)\n    .join(', ');\n\n  throw new Error(\n    `No matching HubSpot owners found. Looking for: ${targets.join(', ')}. ` +\n    `Available owners: ${availableOwners}`\n  );\n}\n\nconst missingOwners = targets.filter(target => {\n  return !matches.some(owner => {\n    const fullName = `${owner.firstName || ''} ${owner.lastName || ''}`\n      .trim()\n      .toLowerCase();\n\n    const email = (owner.email || '').trim().toLowerCase();\n\n    return fullName === target || email === target;\n  });\n});\n\nif (missingOwners.length > 0) {\n  const availableOwners = owners\n    .map(owner =>\n      `${owner.firstName || ''} ${owner.lastName || ''}`.trim()\n    )\n    .filter(Boolean)\n    .join(', ');\n\n  throw new Error(\n    `These HubSpot owners were not found: ${missingOwners.join(', ')}. ` +\n    `Available owners: ${availableOwners}`\n  );\n}\n\nreturn matches.map(owner => ({\n  json: {\n    ownerId: String(owner.id),\n    ownerName: `${owner.firstName || ''} ${owner.lastName || ''}`.trim(),\n    ownerEmail: owner.email || ''\n  }\n}));"
+      },
+      "id": "b0567858-35b2-4e64-8063-e0872dfd4fab",
+      "name": "Find Owner ID",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        32,
+        -16
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 30
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -960,
+        -16
+      ],
+      "id": "8cb49f93-910a-45b3-b931-45165958e271",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.hubapi.com/crm/v3/objects/companies/search",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "hubspotAppToken",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"filterGroups\": [\n    { \"filters\": [ { \"propertyName\": \"hubspot_owner_id\", \"operator\": \"EQ\", \"value\": \"{{ $json.ownerId }}\" } ] }\n  ],\n  \"properties\": [\"name\", \"hs_lead_status\", \"hubspot_owner_id\"],\n  \"limit\": 100\n}",
+        "options": {
+          "pagination": {
+            "pagination": {
+              "parameters": {
+                "parameters": [
+                  {
+                    "type": "body",
+                    "name": "after",
+                    "value": "={{ $response.body.paging?.next?.after }}"
+                  }
+                ]
+              },
+              "paginationCompleteWhen": "other",
+              "completeExpression": "={{ $response.body.paging?.next?.after === undefined }}",
+              "requestInterval": 300
+            }
+          }
+        }
+      },
+      "id": "2e9a616e-c8f0-4e18-834b-dd66c4bc11f4",
+      "name": "Get Total leads assigned",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        256,
+        -16
+      ],
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "oRlKNrMVGZZb7WGP",
+          "name": "HubSpot Service Key account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const ownerCounts = {};\nfor (const item of $(\"Find Owner ID\").all()) {\n  ownerCounts[item.json.ownerId] = 0;\n}\n\nfor (const item of $input.all()) {\n  const records = item.json?.results || [item.json];\n\n  for (const record of records) {\n    const ownerId = record.properties?.hubspot_owner_id || \"unassigned\";\n    ownerCounts[ownerId] = (ownerCounts[ownerId] || 0) + 1;\n  }\n}\n\nlet grandTotalLeads = 0;\nconst targetTotal = Number($(\"Total Leads to be Assigned to Each Owner\").all()[0]?.json?.totalLeadsToBeAssigned) || 0;\n\nconst ownersInfo = Object.entries(ownerCounts).map(([ownerId, count]) => {\n  // Clamp negative differences to 0\n  const ownerTotal = Math.max(0, targetTotal - count);\n  grandTotalLeads += ownerTotal;\n\n  return {\n    hubspot_owner_id: ownerId,\n    totalLeads: ownerTotal\n  };\n});\n\nreturn [\n  {\n    json: {\n      totalLeads: Math.max(0, grandTotalLeads),\n      owners_info: ownersInfo\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        -16
+      ],
+      "id": "b98f52a8-6aa7-4d8d-9193-9708ef814439",
+      "name": "Get leads count to be assigned"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1. Fetch lead allocations from \"Get leads count to be assigned\"\nconst allocationItems = $('Get leads count to be assigned').all();\nconst assignments = allocationItems[0]?.json?.owners_info || [];\n\n// 2. Fetch company records from \"Get Leads with No Owner\"\nconst companyItems = $('Get Leads with No Owner').all();\nconst allCompanies = [];\n\nfor (const item of companyItems) {\n  const results = item.json?.results || [item.json];\n  for (const c of results) {\n    if (c.id) {\n      allCompanies.push(String(c.id));\n    }\n  }\n}\n\n// 3. Map company IDs to hubspot_owner_ids based on target counts from owners_info\nconst updates = [];\nlet companyIndex = 0;\n\nfor (const rule of assignments) {\n  const ownerId = String(rule.hubspot_owner_id);\n  const targetCount = Number(rule.totalLeads) || 0;\n  let assignedCount = 0;\n\n  while (companyIndex < allCompanies.length && assignedCount < targetCount) {\n    updates.push({\n      id: allCompanies[companyIndex],\n      properties: {\n        hubspot_owner_id: ownerId\n      }\n    });\n    companyIndex++;\n    assignedCount++;\n  }\n}\n\n// 4. Chunk into batches of 100 for HubSpot's Batch Update API\nconst BATCH_SIZE = 100;\nconst batches = [];\n\nfor (let i = 0; i < updates.length; i += BATCH_SIZE) {\n  batches.push({\n    json: {\n      inputs: updates.slice(i, i + BATCH_SIZE)\n    }\n  });\n}\n\nreturn batches;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1216,
+        -16
+      ],
+      "id": "9331816e-3087-4097-a4bb-a6596dd7c95c",
+      "name": "Map Owners to Leads"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.hubapi.com/crm/v3/objects/companies/batch/update",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "hubspotAppToken",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "1bdcfd77-9e3e-4210-ac19-8acab2732e52",
+      "name": "Update Owners on Leads",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1424,
+        -16
+      ],
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "oRlKNrMVGZZb7WGP",
+          "name": "HubSpot Service Key account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.hubapi.com/crm/v3/objects/companies/search",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "hubspotAppToken",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"filterGroups\": [\n    {\n      \"filters\": [\n        {\n          \"propertyName\": \"lifecyclestage\",\n          \"operator\": \"EQ\",\n          \"value\": \"lead\"\n        },\n        {\n          \"propertyName\": \"confirmed_website___headquarters_phone__\",\n          \"operator\": \"HAS_PROPERTY\"\n        },   \n        {\n          \"propertyName\": \"total_monthly_visits\",\n          \"operator\": \"GTE\",\n          \"value\": 1000\n        },\n        {\n          \"propertyName\": \"total_monthly_visits\",\n          \"operator\": \"LTE\",\n          \"value\": 60000\n        },\n        {\n          \"propertyName\": \"hubspot_owner_id\",\n          \"operator\": \"NOT_HAS_PROPERTY\"\n        },\n        {\n          \"propertyName\": \"hs_lead_status\",\n          \"operator\": \"NOT_IN\",\n          \"values\": [\"Unqualified Low Weight\", \"Unqualified Non US based\", \"Unqualified Bad Product Type\", \"Unqualified Revenue Plus 100 mil\", \"Unqualified Revenue Less 1 mil\", \"DM located BUT cannot reach\", \"Unqualified Cannot Reach\", \"Unqualified Website Down\", \"Unqualified Cannot Compete Pricing\", \"Unqualified Not Interested\", \"# of leads changed to unqualified not interested from UNKNOWN\", \"Unqualified Junk Lead / No shipping\"]\n        }\n      \n      ]\n    }\n  ],\n  \"properties\": [\"name\", \"hs_lead_status\", \"hubspot_owner_id\"],\n  \"limit\": 200\n}",
+        "options": {
+          "pagination": {
+            "pagination": {
+              "parameters": {
+                "parameters": [
+                  {
+                    "type": "body",
+                    "name": "after",
+                    "value": "={{ $response.body.paging?.next?.after }}"
+                  }
+                ]
+              },
+              "paginationCompleteWhen": "other",
+              "completeExpression": "={{ $input.item.json.totalLeads === 0  ? true: (Math.trunc($response.body.paging?.next?.after) || 0) === (Math.ceil($input.item.json.totalLeads / 200) * 200)  }}",
+              "requestInterval": 10000
+            }
+          }
+        }
+      },
+      "id": "f17aa49a-f8ed-4d25-a909-b192f10ed4f8",
+      "name": "Get Leads with No Owner",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        992,
+        -16
+      ],
+      "retryOnFail": false,
+      "maxTries": 2,
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "oRlKNrMVGZZb7WGP",
+          "name": "HubSpot Service Key account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { totalLeadsToBeAssigned: 300 } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -384,
+        -16
+      ],
+      "id": "60d7aa77-7325-4446-8a87-6f8bedac08a4",
+      "name": "Total Leads to be Assigned to Each Owner"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "d49e5127-e8aa-4077-9465-85c5cfb241ad",
+              "leftValue": "={{ $json.totalLeads }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        720,
+        0
+      ],
+      "id": "1b404358-3479-4e32-a5fc-97e3144a3db5",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "UpHbY5v9QREENLR4",
+          "mode": "id",
+          "cachedResultUrl": "/workflow/UpHbY5v9QREENLR4"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        -640,
+        -16
+      ],
+      "id": "2104b0d2-faea-496a-8fd8-876742a100b8",
+      "name": "Call 'HubSpot - Clear Owner for Unqualified Companies'"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Get Owners": {
+      "main": [
+        [
+          {
+            "node": "Find Owner ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Owner ID": {
+      "main": [
+        [
+          {
+            "node": "Get Total leads assigned",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Call 'HubSpot - Clear Owner for Unqualified Companies'",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Total leads assigned": {
+      "main": [
+        [
+          {
+            "node": "Get leads count to be assigned",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get leads count to be assigned": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Map Owners to Leads": {
+      "main": [
+        [
+          {
+            "node": "Update Owners on Leads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Leads with No Owner": {
+      "main": [
+        [
+          {
+            "node": "Map Owners to Leads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Total Leads to be Assigned to Each Owner": {
+      "main": [
+        [
+          {
+            "node": "Get Owners",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Get Leads with No Owner",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call 'HubSpot - Clear Owner for Unqualified Companies'": {
+      "main": [
+        [
+          {
+            "node": "Total Leads to be Assigned to Each Owner",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "bd2407df-2447-4e12-bd65-f93a97e6ff33",
+  "meta": {
+    "instanceId": "c3b4cdfdc8e8d0492e2e46c35155e6b8b86e80d2f7d8e0e6e2ff48ab681a70d0"
+  },
+  "nodeGroups": [],
+  "id": "2FV1XCE0TQPzpNQ5",
+  "tags": []
+}

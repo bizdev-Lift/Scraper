@@ -1,0 +1,243 @@
+{
+  "name": "Enrich Traffic Data",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -768,
+        -96
+      ],
+      "id": "eda1c584-2db1-4b55-b01e-af2cff22d5c5",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "results",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        -48,
+        -128
+      ],
+      "id": "4467c2eb-4e3b-46dc-9ffe-a4a6beb00969",
+      "name": "Split Out"
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://api.hubapi.com/crm/v3/objects/companies/{{ $json.companyId }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "hubspotAppToken",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"properties\": {{ JSON.stringify($json.payload) }}\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        624,
+        -128
+      ],
+      "id": "0c8d92cd-a4ea-4f49-81e2-b2cbe94d2476",
+      "name": "Update HubSpot",
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "oRlKNrMVGZZb7WGP",
+          "name": "HubSpot Service Key account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// $json contains the current item's data directly\nconst rawResponse = $json;\n\nconst monthlyVisits = rawResponse.EstimatedMonthlyVisits || {};\nconst visitKeys = Object.keys(monthlyVisits);\n\nconst latestKey = visitKeys.length > 0 \n  ? visitKeys.reduce((max, key) => (key > max ? key : max)) \n  : null;\n\nconst engagements = rawResponse.Engagments || rawResponse.Engagements || {};\nconst traffic = rawResponse.TrafficSources || {};\n// US Traffic% Extraction\nconst topCountries = rawResponse.TopCountryShares || [];\nconst usData = topCountries.find(c => c.CountryCode === 'US');\nconst usTrafficShare = usData ? usData.Value : null;\n\n// Current Date formatted as YYYY-MM-DD\nconst currentDate = new Date().toISOString().split('T')[0];\nreturn {\n  companyId: $(\"Split Out\").item.json.id,\n  payload: {\n    total_monthly_visits: latestKey ? monthlyVisits[latestKey] : null,\n    bounce_rate: engagements.BounceRate ? parseFloat(engagements.BounceRate) : null,\n    pages_per_visit: engagements.PagePerVisit ? parseFloat(engagements.PagePerVisit) : null,\n    time_on_site: engagements.TimeOnSite,\n    traffic_source_search_organic: traffic.SearchOrganic ?? null,\n    traffic_source_search_paid: traffic.SearchPaid ?? null,\n    traffic_source_direct: traffic.Direct ?? null,\n    traffic_source_referrals: traffic.Referrals ?? null,\n    usa_traffic: usTrafficShare,\n    traffic_enrichment_date: currentDate,\n    traffic_enrichment_status_request: \"completed\"\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        400,
+        -128
+      ],
+      "id": "c3ff1e95-df9c-42d8-805e-d758fcac6e68",
+      "name": "Parse Item"
+    },
+    {
+      "parameters": {
+        "url": "https://similarweb-traffic-scale-plan.p.rapidapi.com/traffic",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "domain",
+              "value": "={{ $json.properties.name }}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-rapidapi-host",
+              "value": "similarweb-traffic-scale-plan.p.rapidapi.com"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        192,
+        -128
+      ],
+      "id": "1bd71ef3-0084-4524-b326-1e334ed2f9b7",
+      "name": "Extract Data from RapidAPI-SimilarWebAPI",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "lF6uX8wt0E5SReIv",
+          "name": "RapidAPI-SimilarWebAPI-Traffic"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.hubapi.com/crm/v3/objects/companies/search",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "hubspotAppToken",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"filterGroups\": [\n    { \"filters\": [ {\n          \"propertyName\": \"traffic_enrichment_status_request\",\n          \"operator\": \"EQ\",\n          \"value\": \"requested\"\n        } ] }\n  ],\n  \"properties\": [\"name\", \"traffic_enrichment_status_request\", \"hubspot_owner_id\"],\n  \"limit\": 100\n}",
+        "options": {}
+      },
+      "id": "2c4e341a-ce5d-4fdd-8339-1e8a498d7495",
+      "name": "Get domains for Traffic Enrichment",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -464,
+        -128
+      ],
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "oRlKNrMVGZZb7WGP",
+          "name": "HubSpot Service Key account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const domainRegex = /^(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\\.)+[a-zA-Z]{2,}$/;\nconst output = [];\n\nfor (const item of $input.all()) {\n  const results = item.json.results || [];\n\n  for (const company of results) {\n    const rawName = company.properties?.name || '';\n    const cleanDomain = rawName.trim().toLowerCase();\n\n    if (domainRegex.test(cleanDomain)) {\n      output.push({\n        \n          ...company, // Retains all original keys\n          domain: cleanDomain\n        }\n      );\n    }\n  }\n}\n\nreturn {\"results\": output};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -240,
+        -128
+      ],
+      "id": "cfdcabdc-ce98-410a-8b97-ea28703930a5",
+      "name": "Validate Domains"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get domains for Traffic Enrichment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out": {
+      "main": [
+        [
+          {
+            "node": "Extract Data from RapidAPI-SimilarWebAPI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Item": {
+      "main": [
+        [
+          {
+            "node": "Update HubSpot",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Data from RapidAPI-SimilarWebAPI": {
+      "main": [
+        [
+          {
+            "node": "Parse Item",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get domains for Traffic Enrichment": {
+      "main": [
+        [
+          {
+            "node": "Validate Domains",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Domains": {
+      "main": [
+        [
+          {
+            "node": "Split Out",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "9293a4f5-c070-4dea-a66b-067f4b52d005",
+  "meta": {
+    "instanceId": "c3b4cdfdc8e8d0492e2e46c35155e6b8b86e80d2f7d8e0e6e2ff48ab681a70d0"
+  },
+  "nodeGroups": [],
+  "id": "Y7vqrTeD5k1gE9ut",
+  "tags": []
+}
