@@ -111,7 +111,9 @@ class MainExecutor:
 
         # We only process US domains.
         if not self.is_valid_domain(record.company_url):
-            default_summary.lead_status = "Unqualified - Non-US Based"
+            default_summary.lead_status = "Scraper Unqualified - Unqualified - BAD TLD"
+            default_summary.lifecycle_stage = "1410598780"
+            default_summary.hs_lead_status = "Unqualified Revenue Less 1 mil"
             return "error", default_summary
 
         logger.info(f"Processing url={record.company_url}")
@@ -365,6 +367,7 @@ class MainExecutor:
             default_summary = self._get_default_summary()
             default_summary.lifecycle_stage = lifecycle_stage
             default_summary.hs_lead_status = lead_status
+            default_summary.lead_status = "skip scrape"
             default_summary.traffic_result = traffic_data
             return "success", default_summary
 
