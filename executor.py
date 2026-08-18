@@ -380,6 +380,7 @@ class MainExecutor:
             return "success", default_summary
 
         mode, result = self._process_record(record)
+        result.lifecycle_stage = lifecycle_stage
         result.traffic_result = traffic_data
         if self.strategy.pre_enrich:
             website_url = record.company_url
@@ -397,6 +398,7 @@ class MainExecutor:
             result.apollo_result = apollo_result.get(website_url, ApolloResult())
             result.seamless_result = seamless_result.get(website_url, SeamlessResult())
             result.ahrefs_result = ahrefs_result.get(website_url, AhrefsResult())
+
         return mode, result
 
     def compute_lead_status(
