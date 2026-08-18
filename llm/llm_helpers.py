@@ -8,7 +8,7 @@ import requests
 
 from _types import DomainResponse
 from config import settings
-from io_operations.google_sheets import GoogleSheetsHandler
+from io_operations.record_stores import GoogleSheetsStore
 from llm._types import GeminiChatCompletion, GeminiResponse
 from llm.image_parsing import create_image_parts
 from llm.utils import clean_llm_response_json_data
@@ -26,7 +26,7 @@ class LLMHelper:
     MAIN_PROMPT: Final[str] = "main_prompt"
     REVENUE_PROMPT: Final[str] = "revenue_prompt"
 
-    def __init__(self, workflow_mode: str, sheets_handler: GoogleSheetsHandler):
+    def __init__(self, workflow_mode: str, sheets_handler: Optional[GoogleSheetsStore]):
         self.model_name = settings.model_name
         if workflow_mode == "regular" and settings.override_model_name:
             self.model_name = settings.override_model_name
@@ -84,7 +84,7 @@ class LLMHelper:
         prompt_tokens = chat_completion.prompt_tokens()
         completion_tokens = chat_completion.completion_tokens()
         cost = chat_completion.cost(prompt_tokens, completion_tokens)
-        if settings.environment != "dev":
+        if self.sheets_handler is not None and settings.environment != "dev":
             self.sheets_handler.update_stats(
                 [url, page_name, prompt_tokens, completion_tokens, cost, self.model_name]
             )

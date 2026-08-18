@@ -1,12 +1,7 @@
 import uuid
 from typing import Any
 
-from config import settings
-from io_operations.google_sheets import (
-    GoogleSheetsHandler,
-    ProductionSheetStrategy,
-    RegularSheetStrategy,
-)
+from io_operations.record_stores import create_store
 from io_operations.s3_client import S3Client
 from logger import logger
 
@@ -21,14 +16,12 @@ def _generate_job_id(workflow_mode: str) -> str:
 
 
 def handler(event: dict, context: Any) -> dict:
-    """Split domains from the sheet into chunks for parallel processing."""
+    """Split records into chunks for parallel processing.
+
+    hubspot mode reads its input from HubSpot; regular/production read
+    from Google Sheets.
+    """
     workflow_mode = event["workflow_mode"]
-    handler_ = GoogleSheetsHandler(settings.spreadsheet_info)
-    strategy = (
-        ProductionSheetStrategy(handler_)
-        if workflow_mode == "production"
-        else RegularSheetStrategy(handler_)
-    )
     job_id = _generate_job_id(workflow_mode)
     logger.info(f"Generated job_id={job_id} for workflow_mode={workflow_mode}")
-    return strategy.build_response(job_id)
+    return create_store(workflow_mode).build_response(job_id)

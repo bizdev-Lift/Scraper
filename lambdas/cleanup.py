@@ -2,12 +2,7 @@ import json
 from typing import Any
 
 from _types import DomainInput
-from config import settings
-from io_operations.google_sheets import (
-    GoogleSheetsHandler,
-    ProductionSheetStrategy,
-    RegularSheetStrategy,
-)
+from io_operations.record_stores import create_store
 from io_operations.s3_client import S3Client
 from logger import logger
 
@@ -22,33 +17,24 @@ def handler(event: dict, context: Any) -> dict:
         logger.error("No job_id in event")
         return {"saved": 0, "deleted": 0}
 
-    strategy = _create_strategy(workflow_mode)
+    store = create_store(workflow_mode)
 
     processed, failed, staging_keys = _read_staged_results(workflow_mode, job_id)
 
     if processed or failed:
-        strategy.save_results(processed, failed)
+        store.save_results(processed, failed)
 
     to_delete = _resolve_records_to_delete(processed, workflow_mode, event)
+    deleted = 0
     if workflow_mode == "production" and to_delete:
-        strategy.on_complete(to_delete, job_id=job_id)
+        store.on_complete(to_delete, job_id=job_id)
+        deleted = len(to_delete)
 
     # TODO: Until we are in testing phase we won't delete these.
     # _cleanup_staging(staging_keys)
 
-    logger.info(
-        f"Job {job_id}: {len(processed)} saved, {len(to_delete)} deleted, {len(failed)} failed"
-    )
-    return {"saved": len(processed), "deleted": len(to_delete)}
-
-
-def _create_strategy(workflow_mode: str):
-    handler_ = GoogleSheetsHandler(settings.spreadsheet_info)
-    return (
-        ProductionSheetStrategy(handler_)
-        if workflow_mode == "production"
-        else RegularSheetStrategy(handler_)
-    )
+    logger.info(f"Job {job_id}: {len(processed)} saved, {deleted} deleted, {len(failed)} failed")
+    return {"saved": len(processed), "deleted": deleted}
 
 
 def _read_staged_results(workflow_mode: str, job_id: str) -> tuple[list, list, list]:

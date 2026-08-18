@@ -22,6 +22,7 @@ class DomainInput:
     company_url: str
     company_name: str | None = None
     old_lead_status: str | None = None
+    hubspot_id: str | None = None
 
 
 @dataclass

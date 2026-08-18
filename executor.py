@@ -18,11 +18,7 @@ from _types import (
 from ahrefs.companies_search import AhrefsAPI
 from apollo.companies_search import ApolloAPI
 from config import settings
-from io_operations.google_sheets import (
-    GoogleSheetsHandler,
-    ProductionSheetStrategy,
-    RegularSheetStrategy,
-)
+from io_operations.record_stores import GoogleSheetsStore, get_store
 from llm.llm_helpers import LLMHelper
 from logger import logger
 from rapidapi.similarwebapi_search import RapidSimilarWebClient
@@ -42,12 +38,12 @@ class ScrapeResult:
 class MainExecutor:
     def __init__(self, workflow_mode: str = "regular") -> None:
         bucket_name = os.environ.get("AWS_BUCKET_NAME")
-        handler = GoogleSheetsHandler(settings.spreadsheet_info)
-        self.strategy = (
-            ProductionSheetStrategy(handler)
-            if workflow_mode == "production"
-            else RegularSheetStrategy(handler)
+        # HubSpot mode never needs Google Sheets - its source and sink are
+        # both HubSpot, so we avoid authenticating against the sheet here.
+        handler = (
+            None if workflow_mode == "hubspot" else GoogleSheetsStore(settings.spreadsheet_info)
         )
+        self.strategy = get_store(workflow_mode, handler)
         self.scraper = GenericScraper(s3_bucket_name=bucket_name)
         self.llm_helper = LLMHelper(workflow_mode, handler)
         self.bot_scraper = BotScraper(s3_bucket_name=bucket_name)

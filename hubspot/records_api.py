@@ -19,6 +19,31 @@ class HubSpotCompaniesClient:
         resp.raise_for_status()
         return resp.json()
 
+    def _patch(self, path: str, body: dict) -> dict:
+        resp = requests.patch(BASE_URL + path, headers=self.headers, json=body)
+        resp.raise_for_status()
+        return resp.json()
+
+    def search_companies_by_property(
+        self, property_name: str, value: str, limit: int = 100
+    ) -> list[dict]:
+        """
+        Search companies where a property equals a given value.
+
+        Returns a list of raw HubSpot results, e.g.
+        ``[{"id": "123", "properties": {"name": "Example Inc", ...}}, ...]``
+        """
+        body = {
+            "filterGroups": [
+                {"filters": [{"propertyName": property_name, "operator": "EQ", "value": value}]}
+            ],
+            "properties": ["domain", "website", "name"],
+            "limit": limit,
+        }
+
+        data = self._post("/crm/v3/objects/companies/search", body)
+        return data.get("results", [])
+
     def get_existing_domains(self, domains: list[str]) -> set[str]:
         """
         Given a list of domains, returns only those NOT present in HubSpot.
@@ -75,6 +100,29 @@ class HubSpotCompaniesClient:
                 "success": False,
                 "error": {
                     "domain": record.get("domain"),
+                    "status_code": e.response.status_code if e.response is not None else None,
+                    "detail": e.response.text if e.response is not None else str(e),
+                },
+            }
+
+    def update_company(self, company_id: str, properties: dict) -> dict:
+        """
+        Update a single company's properties by its HubSpot object id.
+
+        Returns:
+            {"success": True, "result": {...}} on success
+            {"success": False, "error": {...}} on failure
+        """
+        try:
+            result = self._patch(
+                f"/crm/v3/objects/companies/{company_id}", {"properties": properties}
+            )
+            return {"success": True, "result": result}
+        except requests.HTTPError as e:
+            return {
+                "success": False,
+                "error": {
+                    "company_id": company_id,
                     "status_code": e.response.status_code if e.response is not None else None,
                     "detail": e.response.text if e.response is not None else str(e),
                 },
