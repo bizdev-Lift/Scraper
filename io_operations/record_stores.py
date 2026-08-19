@@ -567,7 +567,7 @@ class HubSpotStore(BaseRecordStore):
     """
 
     SCRAPER_RESULTS_PROPERTY = "scraper_results"
-    REQUESTED_STATUS = "requested"
+    REQUESTED_STATUS = "request new scrape"
 
     def __init__(self, store: Optional[GoogleSheetsStore] = None):
         # store is optional here and unused for records/results - kept only
