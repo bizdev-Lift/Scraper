@@ -36,14 +36,21 @@ class ScrapeResult:
 
 
 class MainExecutor:
-    def __init__(self, workflow_mode: str = "regular") -> None:
+    def __init__(self, workflow_mode: str = "regular", open_store: bool = True) -> None:
         bucket_name = os.environ.get("AWS_BUCKET_NAME")
-        # HubSpot mode never needs Google Sheets - its source and sink are
-        # both HubSpot, so we avoid authenticating against the sheet here.
-        handler = (
-            None if workflow_mode == "hubspot" else GoogleSheetsStore(settings.spreadsheet_info)
-        )
-        self.strategy = get_store(workflow_mode, handler)
+        if open_store:
+            # HubSpot mode never needs Google Sheets - its source and sink are
+            # both HubSpot, so we avoid authenticating against the sheet here.
+            handler = (
+                None if workflow_mode == "hubspot" else GoogleSheetsStore(settings.spreadsheet_info)
+            )
+            self.strategy = get_store(workflow_mode, handler)
+        else:
+            # Worker runs don't need any record store. Opening the sheets
+            # here would burn Google Sheets API quota (429s) across every
+            # concurrent worker without any benefit.
+            handler = None
+            self.strategy = None
         self.scraper = GenericScraper(s3_bucket_name=bucket_name)
         self.llm_helper = LLMHelper(workflow_mode, handler)
         self.bot_scraper = BotScraper(s3_bucket_name=bucket_name)
@@ -53,6 +60,8 @@ class MainExecutor:
         self.simiarweb_api_client = RapidSimilarWebClient()
 
     def run(self) -> None:
+        if self.strategy is None:
+            raise RuntimeError("MainExecutor.run() requires open_store=True")
         records = self.strategy.get_records()
         apollo_results = {}
         seamless_results = {}
@@ -165,7 +174,7 @@ class MainExecutor:
             if revenue:
                 merged_summary.revenue = revenue
 
-        if self.strategy.track_old_lead_status:
+        if self.strategy is not None and self.strategy.track_old_lead_status:
             if isinstance(record.old_lead_status, str) and "LLM Failed" in record.old_lead_status:
                 merged_summary.old_lead_status = record.old_lead_status
 
@@ -378,7 +387,7 @@ class MainExecutor:
         mode, result = self._process_record(record)
         result.lifecycle_stage = lifecycle_stage
         result.traffic_result = traffic_data
-        if self.strategy.pre_enrich:
+        if self.strategy is not None and self.strategy.pre_enrich:
             website_url = record.company_url
             if result.redirected_to:
                 website_url = re.sub(r"http(s)?://(www\.)?", "", result.redirected_to)

@@ -14,10 +14,11 @@ s3 = S3Client()
 def handler(event: dict, context: Any) -> dict:
     """Process a chunk of domains and stage results to S3 for batch save.
 
-    In hubspot mode, results are additionally pushed straight back to
-    HubSpot via the store's on_success/on_error hooks (no Google Sheets
-    involvement). In regular/production mode results are only staged and
-    saved later by the cleanup Lambda.
+    Workers never open Google Sheets (`MainExecutor(open_store=False)`) -
+    doing so would burn Google Sheets API quota (429s) across concurrent
+    workers. Results are staged to S3 and persisted by the cleanup Lambda.
+    In hubspot mode, results are also pushed straight back to HubSpot via
+    the store's on_success/on_error hooks.
     """
     domains = event.get("domains", [])
     workflow_mode = event.get("workflow_mode", "regular")
@@ -27,7 +28,7 @@ def handler(event: dict, context: Any) -> dict:
     if not domains:
         return {"chunk_id": chunk_id, "domain_count": 0, "status": "empty"}
 
-    executor = MainExecutor(workflow_mode=workflow_mode)
+    executor = MainExecutor(workflow_mode=workflow_mode, open_store=False)
     store = create_store(workflow_mode) if workflow_mode == "hubspot" else None
     processed = []
     failed = []
