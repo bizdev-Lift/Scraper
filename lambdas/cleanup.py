@@ -24,11 +24,13 @@ def handler(event: dict, context: Any) -> dict:
     if processed or failed:
         store.save_results(processed, failed)
 
-    to_delete = _resolve_records_to_delete(processed, workflow_mode, event)
     deleted = 0
-    if workflow_mode == "production" and to_delete:
-        store.on_complete(to_delete, job_id=job_id)
-        deleted = len(to_delete)
+
+    if workflow_mode == "production":
+        to_delete = _resolve_records_to_delete(processed, failed, workflow_mode, event)
+        if to_delete:
+            store.on_complete(to_delete, job_id=job_id)
+            deleted = len(to_delete)
 
     # TODO: Until we are in testing phase we won't delete these.
     # _cleanup_staging(staging_keys)
@@ -54,14 +56,16 @@ def _read_staged_results(workflow_mode: str, job_id: str) -> tuple[list, list, l
 
 
 def _resolve_records_to_delete(
-    processed: list, workflow_mode: str, event: dict
+    processed: list, failed: list, workflow_mode: str, event: dict
 ) -> list[DomainInput]:
     to_delete = [DomainInput(row_no=r["row_no"], company_url=r["domain"]) for r in processed]
-    if workflow_mode == "production":
-        to_delete.extend(
+    to_delete.extend([DomainInput(row_no=r["row_no"], company_url=r["domain"]) for r in failed])
+    to_delete.extend(
+        [
             DomainInput(row_no=r["row_no"], company_url=r["domain"])
             for r in event.get("skipped_records", [])
-        )
+        ]
+    )
     return to_delete
 
 
