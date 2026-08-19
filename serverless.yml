@@ -182,6 +182,22 @@ resources:
               - DomainDataExtractorSchedulerRole
               - Arn
 
+    DomainDataExtractorHubSpotScheduler:
+      Type: AWS::Scheduler::Schedule
+      Properties:
+        Name: DomainDataExtractorStateMachine_HubSpot
+        ScheduleExpression: "rate(15 minutes)"
+        FlexibleTimeWindow:
+          Mode: OFF
+        State: ENABLED
+        Target:
+          Arn:
+            Fn::Sub: arn:aws:states:${AWS::Region}:${AWS::AccountId}:stateMachine:DomainDataExtractorStateMachine_SingleSheet
+          RoleArn:
+            Fn::GetAtt:
+              - DomainDataExtractorSchedulerRole
+              - Arn
+
 stepFunctions:
   stateMachines:
     domain-processing-pipeline:
@@ -234,6 +250,46 @@ stepFunctions:
             Type: Task
             Parameters:
               workflow_mode: "regular"
+            Resource:
+              Fn::GetAtt:
+                - domain-splitter
+                - Arn
+            ResultPath: $
+            Next: ProcessChunks
+          ProcessChunks:
+            Type: Map
+            ItemsPath: $.chunks
+            MaxConcurrency: 4
+            ResultPath: $.results
+            Iterator:
+              StartAt: Worker
+              States:
+                Worker:
+                  Type: Task
+                  Resource:
+                    Fn::GetAtt:
+                      - domain-worker
+                      - Arn
+                  End: true
+            Next: Cleanup
+          Cleanup:
+            Type: Task
+            Resource:
+              Fn::GetAtt:
+                - domain-cleanup
+                - Arn
+            End: true
+
+    domain-processing-hubspot:
+      name: DomainDataExtractorStateMachine_HubSpot
+      definition:
+        Comment: Domain Processing Pipeline — HubSpot native (hubspot)
+        StartAt: SplitDomains
+        States:
+          SplitDomains:
+            Type: Task
+            Parameters:
+              workflow_mode: "hubspot"
             Resource:
               Fn::GetAtt:
                 - domain-splitter
