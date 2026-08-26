@@ -1,0 +1,146 @@
+{
+  "name": "HubSpot - Lead Scoring",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "f9fd5f6a-8994-446c-868b-aef802453432",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.hubapi.com/crm/v3/objects/companies/search",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "hubspotAppToken",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"filterGroups\": [\n    {\n      \"filters\": [\n        {\n          \"propertyName\": \"lead_score_request_status\",\n          \"operator\": \"EQ\",\n          \"value\": \"requested\"\n        }\n      ]\n    }\n  ],\n  \"properties\": [\n    \"name\",\n    \"is_website_live_\",\n    \"hs_lead_status\",\n    \"hubspot_owner_id\",\n    \"ecommerce_platform\",\n    \"address_listed_on_website_\",\n    \"do_the_sell_b2c\",\n    \"do_the_sell_b2b\",\n    \"founded_year\",\n    \"total_revenue\",\n    \"scraper_carriers\",\n    \"scraper_shipping_messages\",\n    \"scraper_shipping_methods\",\n    \"scraper_smallest_product_cubic\",\n    \"scraper_product_dimensions\",\n    \"scraper_smallest_product_name\",\n    \"scraper_largest_product_cubic\",\n    \"scraper_largest_product_dimensions\",\n    \"scraper_largest_product_name\",\n    \"linkedin_company_page\",\n    \"industry_type_verified\",\n    \"confirmed_website___headquarters_phone__\",\n    \"total_monthly_visits\",\n    \"usa_traffic\",\n    \"traffic_source_search_paid\",\n    \"time_on_site\",\n    \"bounce_rate\",\n    \"notes_last_contacted\",\n    \"annualrevenue\",\n    \"hs_revenue_range\",\n    \"hs_lead_status\",\n    \"lifecyclestage\"\n  ],\n  \"limit\": 200\n}",
+        "options": {
+          "pagination": {
+            "pagination": {
+              "parameters": {
+                "parameters": [
+                  {
+                    "type": "body",
+                    "name": "after",
+                    "value": "={{ $response.body.paging?.next?.after }}"
+                  }
+                ]
+              },
+              "paginationCompleteWhen": "other",
+              "completeExpression": "={{ $response.body.paging?.next?.after === undefined || $response.body.paging?.next?.after === \"600\" }}"
+            }
+          }
+        }
+      },
+      "id": "8872c1a6-7d50-473f-a0ef-8befc6772d61",
+      "name": "Get Leads",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        208,
+        0
+      ],
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "oRlKNrMVGZZb7WGP",
+          "name": "HubSpot Service Key account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Function to calculate the lead score for a single lead object\nfunction calculateLeadScore(lead) {\n  let score = 0;\n  let hs_lead_status = lead.properties.hs_lead_status;\n  let hs_lifecycle_stage = lead.properties.lifecyclestage;\n  const research_tags = [];\n\n  const props = (lead && lead.properties) ? lead.properties : {};\n\n  // 1. E-Commerce Platform\n  const knownPlatforms = ['shopify', 'big commerce', 'bigcommerce', 'magento', 'volusion', 'woo commerce', 'woocommerce', 'wix'];\n  const platform = (props.ecommerce_platform || '').toString().toLowerCase();\n  \n  if (knownPlatforms.includes(platform)) {\n    score += 7;\n  } else if (platform === 'other') {\n    score += 3;\n  } else if (platform === 'unknown' || !platform) {\n    score -= 20;\n  }\n\n  // 2. Physical Address Listed\n  const addressListed = props.address_listed_on_website_;\n  if (addressListed === 'yes') {\n    score += 10;\n  } else if (addressListed === 'no') {\n    score -= 15;\n  }\n\n  // 3. Business Model (B2B / B2C)\n  const sellsB2B = props.do_the_sell_b2b;\n  if (sellsB2B === 'yes') {\n    score += 5;\n  } else {\n    hs_lead_status = \"Unqualified Revenue Less 1 mil\"\n    hs_lifecycle_stage = \"1410598780\"\n  }\n  const sellsB2C = props.do_the_sell_b2c;\n  if (sellsB2C === 'yes') {\n    score += 10;\n  } else if (sellsB2C === 'no') {\n    score -= 15;\n    hs_lead_status = \"Unqualified Revenue Less 1 mil\"\n    hs_lifecycle_stage = \"1410598780\"\n  }\n\n  // 4. Year Founded\n  const founded = parseInt(props.founded_year, 10);\n  if (!isNaN(founded)) {\n    if (founded >= 2020) {\n      score += 3;\n    } else if (founded >= 2000 && founded <= 2019) {\n      score += 2;\n    } else if (founded > 0 && founded < 2000) {\n      score += 1;\n    }\n  }\n\n  // 5. Revenue Range (HubSpot)\n  const hs_revenue_range = parseFloat(props.hs_revenue_range) || 0;\n\n  if (hs_revenue_range > 0 && hs_revenue_range <= 1000000) {\n    score += 3;\n  } else if (hs_revenue_range > 1000000 && hs_revenue_range <= 10000000) {\n    score += 25;\n  } else if (hs_revenue_range > 10000000 && hs_revenue_range <= 50000000) {\n    score += 10;\n  } else if (hs_revenue_range > 50000000 && hs_revenue_range <= 100000000) {\n    score -= 30;\n    hs_lead_status = \"Unqualified Revenue Plus 100 mil\"\n    hs_lifecycle_stage = \"1410598780\"\n  } else if (hs_revenue_range > 100000000 && hs_revenue_range <= 200000000) {\n    score -= 40;\n    hs_lead_status = \"Unqualified Revenue Plus 100 mil\"\n    hs_lifecycle_stage = \"1410598780\"\n  } else if (hs_revenue_range > 250000000 && hs_revenue_range <= 500000000) {\n    score -= 50;\n    hs_lead_status = \"Unqualified Revenue Plus 100 mil\"\n    hs_lifecycle_stage = \"1410598780\"\n  } else if (hs_revenue_range > 500000000 && hs_revenue_range <= 1000000000) {\n    score -= 60;\n    hs_lead_status = \"Unqualified Revenue Plus 100 mil\"\n    hs_lifecycle_stage = \"1410598780\"\n  } \n\n  const hs_annual_revenue = parseFloat(props.annualrevenue) || 0;\n  if (hs_annual_revenue > 500000 && hs_annual_revenue <= 1500000) {\n    score += 5;\n  } else if (hs_annual_revenue > 1500000 && hs_annual_revenue <= 10000000) {\n    score += 10;\n  } else if (hs_annual_revenue > 10000000 && hs_annual_revenue <= 30000000) {\n    score += 7;\n  } else if (hs_annual_revenue > 30000000) {\n    score -= 50;\n    hs_lead_status = \"Unqualified Revenue Plus 100 mil\"\n    hs_lifecycle_stage = \"1410598780\"\n  }\n\n  // 5. Annual Revenue (Scraper)\n  const revenue = parseFloat(props.total_revenue) || 0;\n  if (revenue > 30000000) {\n    score -= 50;\n    hs_lead_status = \"Unqualified Revenue Plus 100 mil\"\n    hs_lifecycle_stage = \"1410598780\"\n  } else if (revenue > 20000000 && revenue <= 30000000) {\n    score += 5;\n  } else if (revenue > 5000000 && revenue <= 20000000) {\n    score += 15;\n  } else if (revenue == 5000000) {\n    score += 10;\n  }\n  // 6. Shipping Carriers & Methods\n  const carriers = (props.scraper_carriers || '').toString().toUpperCase();\n  if (carriers.includes('UPS') || carriers.includes('FEDEX')) {\n    score += 10;\n  }\n\n  const shippingMsg = (props.scraper_shipping_messages || '').toString().toLowerCase();\n  if (shippingMsg.includes('free')) {\n    research_tags.push(\"Free Shipping Offered\");\n  }\n\n  const shipMethod = (props.scraper_shipping_methods || '').toString().toLowerCase();\n  if (shipMethod === 'international') {\n    score += 10;\n    research_tags.push(\"International Shipping Needs\");\n  } else if (shipMethod === 'domestic only') {\n    score += 5;\n  }\n\n  // 7. Product Cubic Size & Pricing\n  const smallestCubic = parseFloat(props.scraper_smallest_product_cubic) || 0;\n  if (smallestCubic >= 30000) {\n    score += 5;\n    research_tags.push(\"LTL / Freight Suspect\");\n  } else if (smallestCubic > 15000 && smallestCubic <= 30000) {\n    score += 15;\n  } else if (smallestCubic > 3000 && smallestCubic <= 15000) {\n    score += 10;\n  } else if (smallestCubic > 0 && smallestCubic <= 3000) {\n    score -= 5;\n  }\n  const smallestPrice = parseFloat(props.scraper_smallest_product_cubic) || 0;\n  if (smallestPrice < 10) {\n  } else if (smallestPrice > 100 && smallestPrice <= 1000) {\n    score += 5;\n  }\n\n  // 7. Product Cubic Size & Pricing\n  const largestCubic = parseFloat(props.scraper_largest_product_cubic) || 0;\n  if (largestCubic < 1000) {\n  } else if (largestCubic >= 1000 && largestCubic < 3000) {\n    score += 2;\n  } else if (largestCubic >= 3000 && largestCubic < 15000) {\n    score += 10;\n    research_tags.push(\"Ideal Size Products\");\n  } else if (largestCubic >= 15000 && largestCubic < 30000) {\n    score += 15;\n  } else if (largestCubic > 30000) {\n    score += 5;\n    research_tags.push(\"LTL / Freight Suspect\");\n  }\n  const largestPrice = parseFloat(props.scraper_largest_product_cubic) || 0;\n  if (largestPrice > 0 && largestPrice <= 20) {\n    score -= 10;\n    research_tags.push(\"Low Value Products\");\n  } else if (largestPrice > 20 && largestPrice <= 100) {\n    score += 5;\n    research_tags.push(\"Low Value Products\");\n  } else if (largestPrice > 100 && largestPrice <= 1000) {\n    score += 10;\n    research_tags.push(\"Ideal Value Products\");\n  } else if (largestPrice > 1000 && largestPrice <= 5000) {\n    score += 5;\n    research_tags.push(\"High Value Products\");\n  } else if (largestPrice > 5000) {\n    research_tags.push(\"High Value Products\");\n  }\n\n  // 8. Verified Industry Type\n  const industry = (props.industry_type_verified || '').toString().toLowerCase();\n  const topTierIndustries = ['auto parts', 'sporting goods', 'outdoor', 'electronics'];\n  const midTierIndustries = ['home goods', 'industrial or manufacturing', 'food and beverage'];\n  const lowTierIndustries = ['apparel', 'cosmetics', 'medical', '3pl'];\n\n  if (topTierIndustries.some(i => industry.includes(i))) {\n    score += 10;\n  } else if (midTierIndustries.some(i => industry.includes(i))) {\n    score += 5;\n  } else if (lowTierIndustries.some(i => industry.includes(i))) {\n    score += 2;\n  }\n\n  // 9. Contact Info (Phone)\n  const phone = (props.confirmed_website___headquarters_phone__ || '').toString().trim();\n  if (!phone || phone.toLowerCase() === null || phone.toLowerCase() === '') {\n    score -= 30;\n  } else {\n    score += 10;\n  }\n\n  // 10. Monthly Web Visits & Sales Routing Logic\n  const visits = parseFloat(props.total_monthly_visits) || 0;\n  if (visits > 500000) {\n    score -= 75;\n    hs_lead_status = \"Unqualified Revenue Plus 100 mil\"\n    hs_lifecycle_stage = \"1410598780\"\n    research_tags.push(\"Extra Large Web Traffic\");\n  } else if (visits > 150000 && visits <= 500000) {\n    score += 45;\n    research_tags.push(\"Big Web Traffic\");\n  } else if (visits > 90000 && visits <= 150000) {\n    score += 40;\n    research_tags.push(\"Big Web Traffic\");\n  } else if (visits > 60000 && visits <= 90000) {\n    score += 35;\n    research_tags.push(\"Big Web Traffic\");\n  } else if (visits > 30000 && visits <= 60000) {\n    score += 30;\n    research_tags.push(\"Ideal Web Traffic\");\n  } else if (visits > 10000 && visits <= 30000) {\n    score += 25;\n    research_tags.push(\"Ideal Web Traffic\");\n  } else if (visits > 5000 && visits <= 10000) {\n    score += 20;\n    research_tags.push(\"Ideal Web Traffic\");\n  } else if (visits > 3000 && visits <= 5000) {\n    score += 15;\n    research_tags.push(\"Ideal Web Traffic\");\n  } else if (visits > 1000 && visits <=3000) {\n    score -= 10;\n    research_tags.push(\"Small Web Traffic\");\n  } else if (visits > 100 && visits <= 1000) {\n    score -= 25;\n    research_tags.push(\"Small Web Traffic\");\n  } else if (visits > 0 && visits <= 100) {\n    score -= 50;\n    hs_lead_status = \"Unqualified Revenue Less 1 mil\"\n    hs_lifecycle_stage = \"1410598780\"\n  }\n\n  // 11. US Traffic Ratio\n  let usTrafficRatio = parseFloat(props.usa_traffic);\n  if (isNaN(usTrafficRatio)) {\n    usTrafficRatio = 1.0;\n  }\n  \n  if (usTrafficRatio < 0.5) {\n    score -= 10;\n    hs_lead_status = \"Unqualified Revenue Less 1 mil\"\n    hs_lifecycle_stage = \"1410598780\"\n    // tags.push('suspected non-us based');\n  } else if (usTrafficRatio > 0.5 && usTrafficRatio <= 0.9) {\n    score += 5;\n    research_tags.push(\"International Shipping Needs\");\n    // tags.push('International shipping suspect');\n  }\n  const is_website_live = props.is_website_live_;\n  if (industry == \"na\" && (is_website_live == \"\" || is_website_live == null)) {\n    score = -4444444\n  }\n  const currentDate = new Date().toISOString().split('T')[0];\n\n  return {\n    id: lead.id,\n    properties: {\n      lead_score: score,\n      lead_score_date: currentDate,\n      lead_score_request_status: \"completed\",\n      research_tags: research_tags.join(\";\")\n    }\n  };\n}\n\n// ==========================================\n// N8N ARRAY PARSING LOGIC:\n// ==========================================\n\nconst outputItems = [];\n\n// Loop through each incoming n8n item and calculate scores\nfor (const item of $input.all()) {\n  const results = item.json.results || [];\n  for (const record of results) {\n    outputItems.push(calculateLeadScore(record));\n  }\n}\n\n// Split the parsed output items into chunks of 100\nconst chunkSize = 100;\nconst finalBatches = [];\n\nfor (let i = 0; i < outputItems.length; i += chunkSize) {\n  const chunk = outputItems.slice(i, i + chunkSize);\n  finalBatches.push({\n    json: {\n      results: chunk\n    }\n  });\n}\nreturn finalBatches;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        432,
+        0
+      ],
+      "id": "b88d49c8-eae8-48a4-bbfd-79fbb95f60e6",
+      "name": "Calculate Score"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.hubapi.com/crm/v3/objects/companies/batch/update",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "hubspotAppToken",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"inputs\": {{ JSON.stringify($json.results) }}\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        640,
+        0
+      ],
+      "id": "8e93fdc2-9826-49cc-8ccc-f2bdba48866a",
+      "name": "Update HubSpot",
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "oRlKNrMVGZZb7WGP",
+          "name": "HubSpot Service Key account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Get Leads": {
+      "main": [
+        [
+          {
+            "node": "Calculate Score",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calculate Score": {
+      "main": [
+        [
+          {
+            "node": "Update HubSpot",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Get Leads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "11b8b673-6e86-48ae-8b22-40d50c4862d2",
+  "meta": {
+    "instanceId": "c3b4cdfdc8e8d0492e2e46c35155e6b8b86e80d2f7d8e0e6e2ff48ab681a70d0"
+  },
+  "nodeGroups": [],
+  "id": "CqnUckhpp8ego2u7",
+  "tags": []
+}

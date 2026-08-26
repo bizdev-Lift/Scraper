@@ -3,25 +3,6 @@
   "nodes": [
     {
       "parameters": {
-        "rule": {
-          "interval": [
-            {
-              "field": "minutes"
-            }
-          ]
-        }
-      },
-      "type": "n8n-nodes-base.scheduleTrigger",
-      "typeVersion": 1.3,
-      "position": [
-        -768,
-        -96
-      ],
-      "id": "eda1c584-2db1-4b55-b01e-af2cff22d5c5",
-      "name": "Schedule Trigger"
-    },
-    {
-      "parameters": {
         "fieldToSplitOut": "results",
         "options": {}
       },
@@ -156,21 +137,29 @@
       ],
       "id": "cfdcabdc-ce98-410a-8b97-ea28703930a5",
       "name": "Validate Domains"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -736,
+        -128
+      ],
+      "id": "bd97676e-d255-48de-833f-c80b6d04e0c0",
+      "name": "Schedule Trigger"
     }
   ],
   "pinData": {},
   "connections": {
-    "Schedule Trigger": {
-      "main": [
-        [
-          {
-            "node": "Get domains for Traffic Enrichment",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "Split Out": {
       "main": [
         [
@@ -225,6 +214,17 @@
           }
         ]
       ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get domains for Traffic Enrichment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": true,
@@ -233,7 +233,7 @@
     "binaryMode": "separate",
     "availableInMCP": false
   },
-  "versionId": "9293a4f5-c070-4dea-a66b-067f4b52d005",
+  "versionId": "d4630e60-f86c-4a56-8512-4cdf4bdda674",
   "meta": {
     "instanceId": "c3b4cdfdc8e8d0492e2e46c35155e6b8b86e80d2f7d8e0e6e2ff48ab681a70d0"
   },
