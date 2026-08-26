@@ -148,6 +148,7 @@ resources:
                   Resource:
                     - Fn::Sub: arn:aws:states:${AWS::Region}:${AWS::AccountId}:stateMachine:DomainDataExtractorStateMachine
                     - Fn::Sub: arn:aws:states:${AWS::Region}:${AWS::AccountId}:stateMachine:DomainDataExtractorStateMachine_SingleSheet
+                    - Fn::Sub: arn:aws:states:${AWS::Region}:${AWS::AccountId}:stateMachine:DomainDataExtractorStateMachine_HubSpot
 
 
     DomainDataExtractorScheduler:
@@ -192,7 +193,7 @@ resources:
         State: ENABLED
         Target:
           Arn:
-            Fn::Sub: arn:aws:states:${AWS::Region}:${AWS::AccountId}:stateMachine:DomainDataExtractorStateMachine_SingleSheet
+            Fn::Sub: arn:aws:states:${AWS::Region}:${AWS::AccountId}:stateMachine:DomainDataExtractorStateMachine_HubSpot
           RoleArn:
             Fn::GetAtt:
               - DomainDataExtractorSchedulerRole

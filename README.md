@@ -139,7 +139,7 @@ You can run each Lambda handler locally for debugging via `main.py`. The sample 
 
 ## ⚙️ How the Code Works
 This application performs automated data insights for each domain using generic scraper along with AI Agent. Important components in this are.
-- `io_operations`: This module contains scripts for fetching and storing data from/to Google Sheets.
+- `io_operations`: This module contains the **record stores** responsible for fetching input records and persisting results. It supports a Google Sheets backend (`GoogleSheetsStore`) and a HubSpot-native backend (`HubSpotStore`). The right store is picked per workflow mode by `create_store`/`get_store` in `record_stores.py`.
 - `scraper`: This module contains an http generic scraper along with a bot scraper.
     - `generic_scraper`: An HTTP scraper that makes an HTTP call to fetch the HTML data.
     - `bot_scraper`: Fetch the HTML using playwright browser.
@@ -191,12 +191,14 @@ This will:
 
 
 
-## 📄 How to switch Lambda between Single and Production Sheet.
+## 📄 How to switch Lambda between workflow modes.
 - The `workflow_mode` is passed as **input** to the state machine — it is not read from an environment variable anymore.
-- The value is **hardcoded inside each Step Functions state machine** (via the `Parameters` field on the `SplitDomains` state), so there are **two separate state machines**:
+- The value is **hardcoded inside each Step Functions state machine** (via the `Parameters` field on the `SplitDomains` state), so there are **three separate state machines**:
   - `DomainDataExtractorStateMachine` → `workflow_mode: "production"` → runs against the production sheet.
   - `DomainDataExtractorStateMachine_SingleSheet` → `workflow_mode: "regular"` → runs against the single sheet.
-- Both are triggered on their own EventBridge schedulers every 15 minutes.
+  - `DomainDataExtractorStateMachine_HubSpot` → `workflow_mode: "hubspot"` → reads from and writes to HubSpot only; Google Sheets is never touched.
+- The production and single-sheet state machines are triggered by their own EventBridge schedulers every 15 minutes.
+- **Workers never open Google Sheets.** The worker Lambda runs `MainExecutor(open_store=False)`, so it only scrapes/enriches and stages results to S3 — reading/writing sheets happens exclusively in the splitter and cleanup Lambdas. This keeps concurrent workers from burning Google Sheets API quota (HTTP 429 rate-limit errors).
 
 ## 📄 How to Update the Sheets Used
 Each workflow reads its sheet from its own set of environment variables:
@@ -214,6 +216,20 @@ SINGLE_SHEET_NAME=<sheet_name>
 ```
 
 `SPREADSHEET_ID` can be extracted from the URL of the sheet. `SHEET_NAME` is the sheet name from inside the Google Sheet.
+
+The **HubSpot** workflow does not use any of the sheet variables above — see the section below.
+
+## 📄 HubSpot Workflow
+
+In `hubspot` mode the pipeline never reads from or writes to Google Sheets — both the input and the output live in HubSpot:
+
+1. **Read** — the splitter searches HubSpot for companies whose `scraper_results` property equals `requested` (`HubSpotStore.get_records`).
+2. **Process** — each domain is scraped and enriched exactly like the other workflows, with the same executor/Lambda code.
+3. **Write** — the worker updates each existing HubSpot company in place, using its `hubspot_id`, via `HubSpotStore.on_success`/`on_error`. This flips `scraper_results` to the final lead status and fills the enrichment properties.
+
+Chunk messages carry `hubspot_id` instead of `row_no`, and the cleanup Lambda is effectively a no-op for this mode (results are already persisted by the workers).
+
+Only **`HUBSPOT_API_KEY`** is required for this workflow — no Google Sheets credentials or spreadsheet IDs are needed. If you'll only ever run the HubSpot pipeline, the `SPREADSHEET_*`/`SINGLE_*`/`CREDENTIALS_PATH` variables can be omitted.
 
 ## 🖌️ Sheet Format
 The format of the sheet would be like this.

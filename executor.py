@@ -314,6 +314,8 @@ class MainExecutor:
     ) -> DomainResponse:
         if not summary2:
             summary1.lead_status = self.compute_lead_status(summary1, summary2)
+            if summary1.lead_status.startswith("Unqualified"):
+                summary1.lifecycle_stage = "1410598780"
             return summary1
 
         final_summary = {}

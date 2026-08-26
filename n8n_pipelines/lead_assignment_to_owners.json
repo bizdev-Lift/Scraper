@@ -1,5 +1,5 @@
 {
-  "name": "HubSpot - Lead Assignment to Owners",
+  "name": "HubSpot - Lead Assignment to COLD CALLERS",
   "nodes": [
     {
       "parameters": {
@@ -50,8 +50,8 @@
         "rule": {
           "interval": [
             {
-              "field": "minutes",
-              "minutesInterval": 30
+              "field": "hours",
+              "hoursInterval": 12
             }
           ]
         }
@@ -59,7 +59,7 @@
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.3,
       "position": [
-        -960,
+        -1040,
         -16
       ],
       "id": "8cb49f93-910a-45b3-b931-45165958e271",
@@ -73,7 +73,7 @@
         "nodeCredentialType": "hubspotAppToken",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"filterGroups\": [\n    { \"filters\": [ { \"propertyName\": \"hubspot_owner_id\", \"operator\": \"EQ\", \"value\": \"{{ $json.ownerId }}\" } ] }\n  ],\n  \"properties\": [\"name\", \"hs_lead_status\", \"hubspot_owner_id\"],\n  \"limit\": 100\n}",
+        "jsonBody": "={\n  \"filterGroups\": [\n    { \"filters\": [ { \"propertyName\": \"hubspot_owner_id\", \"operator\": \"EQ\", \"value\": \"{{ $json.ownerId }}\" } ] }\n  ],\n  \"properties\": [\"name\", \"hs_lead_status\", \"hubspot_owner_id\", \"industry_type_verified\", \"annualrevenue\", \"hs_revenue_range\", \"apollo_annual_revenue_number_fix_use_this\"],\n  \"limit\": 100\n}",
         "options": {
           "pagination": {
             "pagination": {
@@ -110,7 +110,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const ownerCounts = {};\nfor (const item of $(\"Find Owner ID\").all()) {\n  ownerCounts[item.json.ownerId] = 0;\n}\n\nfor (const item of $input.all()) {\n  const records = item.json?.results || [item.json];\n\n  for (const record of records) {\n    const ownerId = record.properties?.hubspot_owner_id || \"unassigned\";\n    ownerCounts[ownerId] = (ownerCounts[ownerId] || 0) + 1;\n  }\n}\n\nlet grandTotalLeads = 0;\nconst targetTotal = Number($(\"Total Leads to be Assigned to Each Owner\").all()[0]?.json?.totalLeadsToBeAssigned) || 0;\n\nconst ownersInfo = Object.entries(ownerCounts).map(([ownerId, count]) => {\n  // Clamp negative differences to 0\n  const ownerTotal = Math.max(0, targetTotal - count);\n  grandTotalLeads += ownerTotal;\n\n  return {\n    hubspot_owner_id: ownerId,\n    totalLeads: ownerTotal\n  };\n});\n\nreturn [\n  {\n    json: {\n      totalLeads: Math.max(0, grandTotalLeads),\n      owners_info: ownersInfo\n    }\n  }\n];"
+        "jsCode": "// const INDUSTRY_CAPS = {\n//   'sporting goods or outdoor': 100,\n//   'auto parts': 100,\n//   'home goods': 100,\n//   'industrial or manufacturing': 100,\n//   'food and beverage': 30,\n//   'other': 30,\n//   'electronics': 75,\n//   'apparel': 30,\n//   'cosmetics': 20,\n//   'medical': 20,\n//   '3pl': 0,\n//   'mixed': 20,\n//   'na': 0\n// };\nconst INDUSTRY_CAPS = $('Industry Cap').first().json.results;\n\nconst INDUSTRY_PROPERTY_NAME = 'industry_type_verified'; // <-- confirm exact internal property name\n\nfunction normalizeIndustry(raw) {\n  const v = (raw || '').toString().trim().toLowerCase();\n  if (INDUSTRY_CAPS.hasOwnProperty(v)) return v;\n  return 'other'; // unrecognized values bucket into \"other\"\n}\n\nconst ownerTotalCounts = {};\nconst ownerIndustryCounts = {};\n\nfor (const item of $(\"Find Owner ID\").all()) {\n  ownerTotalCounts[item.json.ownerId] = 0;\n  ownerIndustryCounts[item.json.ownerId] = {};\n}\n\nfor (const item of $input.all()) {\n  const records = item.json?.results || [item.json];\n  for (const record of records) {\n    const ownerId = record.properties?.hubspot_owner_id;\n    // skip records with no owner or an owner not in our known list —\n    // this node only counts EXISTING assignments per real owner\n    if (!ownerId || !ownerTotalCounts.hasOwnProperty(ownerId)) continue;\n\n    const industry = normalizeIndustry(record.properties?.[INDUSTRY_PROPERTY_NAME]);\n\n    ownerTotalCounts[ownerId] = (ownerTotalCounts[ownerId] || 0) + 1;\n    if (!ownerIndustryCounts[ownerId]) ownerIndustryCounts[ownerId] = {};\n    ownerIndustryCounts[ownerId][industry] = (ownerIndustryCounts[ownerId][industry] || 0) + 1;\n  }\n}\nlet grandTotalLeads = 0;\nconst targetTotal = Number($(\"Total Leads to be Assigned to Each Owner\").all()[0]?.json?.totalLeadsToBeAssigned) || 0;\n\nconst ownersInfo = Object.entries(ownerTotalCounts).map(([ownerId, count]) => {\n  const ownerTotal = Math.max(0, targetTotal - count);\n  grandTotalLeads += ownerTotal;\n\n  const industryCapsRemaining = {};\n  for (const [industry, cap] of Object.entries(INDUSTRY_CAPS)) {\n    const alreadyAssigned = ownerIndustryCounts[ownerId]?.[industry] || 0;\n    industryCapsRemaining[industry] = Math.max(0, cap - alreadyAssigned);\n  }\n\n  return { hubspot_owner_id: ownerId, totalLeads: ownerTotal, industryCapsRemaining };\n});\n\nreturn [{ json: { totalLeads: Math.max(0, grandTotalLeads), owners_info: ownersInfo } }];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -123,12 +123,12 @@
     },
     {
       "parameters": {
-        "jsCode": "// 1. Fetch lead allocations from \"Get leads count to be assigned\"\nconst allocationItems = $('Get leads count to be assigned').all();\nconst assignments = allocationItems[0]?.json?.owners_info || [];\n\n// 2. Fetch company records from \"Get Leads with No Owner\"\nconst companyItems = $('Get Leads with No Owner').all();\nconst allCompanies = [];\n\nfor (const item of companyItems) {\n  const results = item.json?.results || [item.json];\n  for (const c of results) {\n    if (c.id) {\n      allCompanies.push(String(c.id));\n    }\n  }\n}\n\n// 3. Map company IDs to hubspot_owner_ids based on target counts from owners_info\nconst updates = [];\nlet companyIndex = 0;\n\nfor (const rule of assignments) {\n  const ownerId = String(rule.hubspot_owner_id);\n  const targetCount = Number(rule.totalLeads) || 0;\n  let assignedCount = 0;\n\n  while (companyIndex < allCompanies.length && assignedCount < targetCount) {\n    updates.push({\n      id: allCompanies[companyIndex],\n      properties: {\n        hubspot_owner_id: ownerId\n      }\n    });\n    companyIndex++;\n    assignedCount++;\n  }\n}\n\n// 4. Chunk into batches of 100 for HubSpot's Batch Update API\nconst BATCH_SIZE = 100;\nconst batches = [];\n\nfor (let i = 0; i < updates.length; i += BATCH_SIZE) {\n  batches.push({\n    json: {\n      inputs: updates.slice(i, i + BATCH_SIZE)\n    }\n  });\n}\n\nreturn batches;"
+        "jsCode": "const INDUSTRY_CAPS = $('Industry Cap').first().json.results;\nconst INDUSTRY_PROPERTY_NAME = 'industry_type_verified'; // <-- confirm exact internal property name\n\nfunction normalizeIndustry(raw) {\n  const v = (raw || '').toString().trim().toLowerCase();\n  if (INDUSTRY_CAPS.hasOwnProperty(v)) return v;\n  return 'other';\n}\n\nconst allocationItems = $('Get leads count to be assigned').all();\nconst assignments = allocationItems[0]?.json?.owners_info || [];\n\nconst ownerState = {};\nfor (const a of assignments) {\n  ownerState[a.hubspot_owner_id] = {\n    totalRemaining: a.totalLeads,\n    industryRemaining: { ...a.industryCapsRemaining }\n  };\n}\nconst ownerOrder = assignments.map(a => a.hubspot_owner_id);\n\nconst companyItems = $('Filter by Revenue').all();\nconst allCompanies = [];\n\nfor (const item of companyItems) {\n  const results = item.json?.results || [item.json];\n  for (const c of results) {\n    if (c.id) {\n      allCompanies.push(c);\n    }\n  }\n}\n\nconst updates = [];\nlet ownerCursor = 0;\n\nfor (const company of allCompanies) {\n  const industry = normalizeIndustry(company.properties?.[INDUSTRY_PROPERTY_NAME]);\n  if ((INDUSTRY_CAPS[industry] || 0) === 0) continue; // 3pl / na never assigned\n\n  for (let attempt = 0; attempt < ownerOrder.length; attempt++) {\n    const ownerId = ownerOrder[ownerCursor];\n    ownerCursor = (ownerCursor + 1) % ownerOrder.length;\n    const state = ownerState[ownerId];\n    if (!state) continue;\n\n    const industryLeft = state.industryRemaining[industry] ?? INDUSTRY_CAPS[industry];\n    if (state.totalRemaining > 0 && industryLeft > 0) {\n      updates.push({ id: String(company.id), properties: { hubspot_owner_id: ownerId } });\n      state.totalRemaining -= 1;\n      state.industryRemaining[industry] = industryLeft - 1;\n      break;\n    }\n  }\n}\n\nconst BATCH_SIZE = 100;\nconst batches = [];\nfor (let i = 0; i < updates.length; i += BATCH_SIZE) {\n  batches.push({ json: { inputs: updates.slice(i, i + BATCH_SIZE) } });\n}\nreturn batches;"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1216,
+        1424,
         -16
       ],
       "id": "9331816e-3087-4097-a4bb-a6596dd7c95c",
@@ -150,7 +150,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
-        1424,
+        1632,
         -16
       ],
       "credentials": {
@@ -168,7 +168,7 @@
         "nodeCredentialType": "hubspotAppToken",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"filterGroups\": [\n    {\n      \"filters\": [\n        {\n          \"propertyName\": \"lifecyclestage\",\n          \"operator\": \"EQ\",\n          \"value\": \"lead\"\n        },\n        {\n          \"propertyName\": \"confirmed_website___headquarters_phone__\",\n          \"operator\": \"HAS_PROPERTY\"\n        },   \n        {\n          \"propertyName\": \"total_monthly_visits\",\n          \"operator\": \"GTE\",\n          \"value\": 1000\n        },\n        {\n          \"propertyName\": \"total_monthly_visits\",\n          \"operator\": \"LTE\",\n          \"value\": 60000\n        },\n        {\n          \"propertyName\": \"hubspot_owner_id\",\n          \"operator\": \"NOT_HAS_PROPERTY\"\n        },\n        {\n          \"propertyName\": \"hs_lead_status\",\n          \"operator\": \"NOT_IN\",\n          \"values\": [\"Unqualified Low Weight\", \"Unqualified Non US based\", \"Unqualified Bad Product Type\", \"Unqualified Revenue Plus 100 mil\", \"Unqualified Revenue Less 1 mil\", \"DM located BUT cannot reach\", \"Unqualified Cannot Reach\", \"Unqualified Website Down\", \"Unqualified Cannot Compete Pricing\", \"Unqualified Not Interested\", \"# of leads changed to unqualified not interested from UNKNOWN\", \"Unqualified Junk Lead / No shipping\"]\n        }\n      \n      ]\n    }\n  ],\n  \"properties\": [\"name\", \"hs_lead_status\", \"hubspot_owner_id\"],\n  \"limit\": 200\n}",
+        "jsonBody": "{\n  \"filterGroups\": [\n    {\n      \"filters\": [\n        { \"propertyName\": \"lifecyclestage\", \"operator\": \"EQ\", \"value\": \"lead\" },\n        { \"propertyName\": \"confirmed_website___headquarters_phone__\", \"operator\": \"HAS_PROPERTY\" },\n        { \"propertyName\": \"total_monthly_visits\", \"operator\": \"GTE\", \"value\": 1000 },\n        { \"propertyName\": \"total_monthly_visits\", \"operator\": \"LTE\", \"value\": 60000 },\n        { \"propertyName\": \"hubspot_owner_id\", \"operator\": \"NOT_HAS_PROPERTY\" },\n        { \"propertyName\": \"hs_lead_status\", \"operator\": \"NOT_IN\", \"values\": [\"Unqualified Low Weight\", \"Unqualified Non US based\", \"Unqualified Bad Product Type\", \"Unqualified Revenue Plus 100 mil\", \"Unqualified Revenue Less 1 mil\", \"DM located BUT cannot reach\", \"Unqualified Cannot Reach\", \"Unqualified Website Down\", \"Unqualified Cannot Compete Pricing\", \"Unqualified Not Interested\", \"# of leads changed to unqualified not interested from UNKNOWN\", \"Unqualified Junk Lead / No shipping\"] }\n      ]\n    }\n  ],\n  \"properties\": [\"name\", \"hs_lead_status\", \"hubspot_owner_id\", \"industry_type_verified\", \"annualrevenue\", \"hs_revenue_range\", \"apollo_annual_revenue_number_fix_use_this\"],\n  \"limit\": 200\n}",
         "options": {
           "pagination": {
             "pagination": {
@@ -212,7 +212,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -384,
+        -608,
         -16
       ],
       "id": "60d7aa77-7325-4446-8a87-6f8bedac08a4",
@@ -272,11 +272,38 @@
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.3,
       "position": [
-        -640,
+        -848,
         -16
       ],
       "id": "2104b0d2-faea-496a-8fd8-876742a100b8",
-      "name": "Call 'HubSpot - Clear Owner for Unqualified Companies'"
+      "name": "Call 'HubSpot - Clear Owner for Unqualified Companies'",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const REVENUE_RANGE_PROPERTY = 'hs_revenue_range'; // <-- confirm real internal name\nconst EXCLUDED_REVENUE_RANGES = ['$50M - $100M', '$100m - $200M', '$250M - $500M', '$500M - $1B'];\n\nconst items = $input.all();\nconst passed = [];\n\nfor (const item of items) {\n  const results = item.json?.results || [item.json];\n  for (const company of results) {\n    const props = company.properties || {};\n\n    const revenueRange = (props[REVENUE_RANGE_PROPERTY] || '').trim();\n    if (EXCLUDED_REVENUE_RANGES.includes(revenueRange)) continue;\n\n    const annualRevenue = props.annualrevenue;\n    const annualRevenueOk = annualRevenue === undefined || annualRevenue === null || annualRevenue === '' || Number(annualRevenue) < 50000000;\n    if (!annualRevenueOk) continue;\n\n    const apolloRevenue = props.apollo_annual_revenue_number_fix_use_this;\n    const apolloRevenueOk = apolloRevenue === undefined || apolloRevenue === null || apolloRevenue === '' || Number(apolloRevenue) < 40000000;\n    if (!apolloRevenueOk) continue;\n\n    passed.push({ json: company });\n  }\n}\n\nreturn passed;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1216,
+        -16
+      ],
+      "id": "daece364-551f-444c-ae52-8e243c24c91c",
+      "name": "Filter by Revenue"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ results: {\n  'sporting goods or outdoor': 100,\n  'auto parts': 100,\n  'home goods': 100,\n  'industrial or manufacturing': 100,\n  'food and beverage': 30,\n  'other': 30,\n  'electronics': 75,\n  'apparel': 30,\n  'cosmetics': 20,\n  'medical': 20,\n  '3pl': 0,\n  'mixed': 20,\n  'na': 0\n} }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -384,
+        -16
+      ],
+      "id": "b17a21e4-c764-49f3-a025-d25b2b40e000",
+      "name": "Industry Cap"
     }
   ],
   "pinData": {},
@@ -351,7 +378,7 @@
       "main": [
         [
           {
-            "node": "Map Owners to Leads",
+            "node": "Filter by Revenue",
             "type": "main",
             "index": 0
           }
@@ -362,7 +389,7 @@
       "main": [
         [
           {
-            "node": "Get Owners",
+            "node": "Industry Cap",
             "type": "main",
             "index": 0
           }
@@ -390,6 +417,28 @@
           }
         ]
       ]
+    },
+    "Filter by Revenue": {
+      "main": [
+        [
+          {
+            "node": "Map Owners to Leads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Industry Cap": {
+      "main": [
+        [
+          {
+            "node": "Get Owners",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": true,
@@ -398,7 +447,7 @@
     "binaryMode": "separate",
     "availableInMCP": false
   },
-  "versionId": "bd2407df-2447-4e12-bd65-f93a97e6ff33",
+  "versionId": "84f4de8e-125a-4615-be74-fa1be27417af",
   "meta": {
     "instanceId": "c3b4cdfdc8e8d0492e2e46c35155e6b8b86e80d2f7d8e0e6e2ff48ab681a70d0"
   },
